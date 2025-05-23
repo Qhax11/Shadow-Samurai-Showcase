@@ -15,8 +15,7 @@ The following gameplay video is from an early prototype using an older version o
 While it's outdated, it still provides a good idea of the core gameplay direction and what I'm trying to achieve.
 
 
-[https://github.com/user-attachments/assets/8005be6e-5b02-4728-a7b4-1dddb030bb07](https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345)
-
+https://github.com/user-attachments/assets/b5b8e26f-11a1-4754-aece-478dfb53e03a
 
 
 ## Contents
