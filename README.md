@@ -14,8 +14,7 @@ The goal is to demonstrate modular design, combat-focused GAS usage, and single-
 The following gameplay video is from an early prototype using an older version of the system.
 While it's outdated, it still provides a good idea of the core gameplay direction and what I'm trying to achieve.
 
-
-https://github.com/user-attachments/assets/b5b8e26f-11a1-4754-aece-478dfb53e03a
+Gameplay video: https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eamil%C3%96zel
 
 
 ## Contents
