@@ -29,8 +29,8 @@ Gameplay video: https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eami
      - [State Manager](#1-State-Manager)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
-          - [Services](#1-Services)
-          - [Scoring](#2-Scoring)
+          - [Services](#3.1-Services)
+          - [Scoring](#3.2-Scoring)
     
      
 
@@ -540,7 +540,7 @@ Key Functions:
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
-### **1. Services** 
+#### **3.1 Services** 
 
 - Behavior Decision Service
 
