@@ -27,6 +27,10 @@ Gameplay video: https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eami
      - [Shadow Finisher](#3-Shadow-Finisher)
 - [AI](#AI)
      - [State Manager](#1-State-Manager)
+          - [Patrolling](#Patrolling)
+          - [Movement](#Movement)
+          - [Attack](#Attack)
+          - [InComingAttack](#InComingAttack)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
           - [Services](#Services)
@@ -525,6 +529,15 @@ void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
     // ...
 }
 ```
+
+#### **Patrolling** 
+
+#### **Movement** 
+
+#### **Attack** 
+
+#### **InComingAttack** 
+
 ### **2. Intend Handler** 
 
 The Intend Handler component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player or being hit by an attack—and to notify the State Manager to initiate a new behavioral sequence.
