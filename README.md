@@ -544,9 +544,7 @@ The UAC_BehaviorDecision component is the AI's tactical layer, responsible for c
 
 #### **Services** 
 
-- Behavior Decision Service
-
-- Core Services
+##### Core Services
 The system is built on a service-oriented architecture, where each decision-making logic is encapsulated within its own class derived from UBehaviorDecisionServiceBase. This modular design prevents a single, cluttered component and allows for easy expansion with new AI behaviors.
 
 - UBDS_GetBestAttack: This service is responsible for selecting the most suitable attack from a list of possibilities.
@@ -557,7 +555,8 @@ The system is built on a service-oriented architecture, where each decision-maki
 
 The UAC_BehaviorDecision component initializes these services and delegates all decision-making tasks to them, acting as the central hub for the AI's tactical choices.
 
-Dynamic Scoring & Decision Logic
+#### **Scoring** 
+
 Every decision within the system is driven by a dynamic scoring mechanism. Services evaluate all available options and select the one with the highest score, which is calculated based on multiple factors.
 
 - Attack Selection Logic:
@@ -571,19 +570,6 @@ The UBDS_GetBestAttack service evaluates potential attacks by a combination of s
 
 - Score Bias: A designer-adjustable value that allows manual prioritization of certain attacks.
 
-Movement Chain Logic:
-The UBDS_GetBestMovementChain service uses a similar scoring model, but with different factors:
-
-Distance: The service gives a higher score to movement chains that will put the AI in an ideal range for a subsequent attack.
-
-Target Movement: The AI's score for a movement chain changes based on whether the player is currently moving.
-
-Behavior State Modifiers: Scores are also influenced by the AI's current state (e.g., a "Staggered" state might give a high score to a backward dodge).
-
-Incoming Attack Reaction Logic:
-The UBDS_ComingAttackReactionBase service determines the best defensive action. Its score is a combination of a BehaviorStateScore, a TagScore (based on the type of incoming attack), and a ScoreBias. The final decision also relies on a chance roll which can be based on a static value or a dynamic attribute like the AI's Posture value, adding a layer of strategic depth.
-
- - GetBestAttack(float DistanceToTarget): Selects the most suitable attack ability. The score calculation for an attack is influenced by:
 
 ![image](https://github.com/user-attachments/assets/ee2008a4-0939-410b-a892-146fd0b9d1c9)
 
