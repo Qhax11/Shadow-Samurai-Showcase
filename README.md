@@ -29,6 +29,8 @@ Gameplay video: https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eami
      - [State Manager](#1-State-Manager)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
+     - - [Services](##1-Services)
+     - - [Scoring](##2-Scoring)
 
 
 ## Gameplay Systems
@@ -536,8 +538,46 @@ Key Functions:
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
-- Dynamic Scoring System:
-This system evaluates all available actions and selects the best one by assigning a score to each. The score is calculated based on multiple factors, allowing the AI to make nuanced and intelligent decisions.
+### **1. Services** 
+
+- Behavior Decision Service
+
+- Core Services
+The system is built on a service-oriented architecture, where each decision-making logic is encapsulated within its own class derived from UBehaviorDecisionServiceBase. This modular design prevents a single, cluttered component and allows for easy expansion with new AI behaviors.
+
+- UBDS_GetBestAttack: This service is responsible for selecting the most suitable attack from a list of possibilities.
+
+- UBDS_GetBestMovementChain: This service determines the optimal movement sequence for the AI, often to accompany an attack or to reposition itself.
+
+- UBDS_ComingAttackReactionBase: This is a base class for services that decide how the AI should react to an incoming attack, such as dodging, parrying, or blocking.
+
+The UAC_BehaviorDecision component initializes these services and delegates all decision-making tasks to them, acting as the central hub for the AI's tactical choices.
+
+Dynamic Scoring & Decision Logic
+Every decision within the system is driven by a dynamic scoring mechanism. Services evaluate all available options and select the one with the highest score, which is calculated based on multiple factors.
+
+- Attack Selection Logic:
+The UBDS_GetBestAttack service evaluates potential attacks by a combination of scores:
+
+- Cooldown & Validity: It first checks if an ability is on cooldown. If it is, the ability is immediately disqualified from consideration.
+
+- Distance Scoring: The CalculateAttackAbilityScoreBasedOnTargetDistance function uses a custom formula to favor attacks whose effective range (MaxRange) closely matches the current distance to the player.
+
+- Combo Scoring: This is a crucial part of creating fluid AI attacks. The CalculateComboScore function assigns a very high score (100.0f) to an attack if it is the next step in a combo chain, encouraging the AI to complete its attack sequences.
+
+- Score Bias: A designer-adjustable value that allows manual prioritization of certain attacks.
+
+Movement Chain Logic:
+The UBDS_GetBestMovementChain service uses a similar scoring model, but with different factors:
+
+Distance: The service gives a higher score to movement chains that will put the AI in an ideal range for a subsequent attack.
+
+Target Movement: The AI's score for a movement chain changes based on whether the player is currently moving.
+
+Behavior State Modifiers: Scores are also influenced by the AI's current state (e.g., a "Staggered" state might give a high score to a backward dodge).
+
+Incoming Attack Reaction Logic:
+The UBDS_ComingAttackReactionBase service determines the best defensive action. Its score is a combination of a BehaviorStateScore, a TagScore (based on the type of incoming attack), and a ScoreBias. The final decision also relies on a chance roll which can be based on a static value or a dynamic attribute like the AI's Posture value, adding a layer of strategic depth.
 
  - GetBestAttack(float DistanceToTarget): Selects the most suitable attack ability. The score calculation for an attack is influenced by:
 
