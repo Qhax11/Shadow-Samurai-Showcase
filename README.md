@@ -26,8 +26,9 @@ Gameplay video: https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eami
      - [Shadow Attack](#3-Shadow-Attack)
      - [Shadow Finisher](#3-Shadow-Finisher)
 - [AI](#AI)
-     - [AI Behavior](#1-AI-Behavior)
-     - [Scoring](#2-Respawn-Handling)
+     - [State Manager](#1-State-Manager)
+     - [Intend Handler](#2-Intend-Handler)
+     - [Behavior Decision](#3-Behavior-Decision)
 
 
 ## Gameplay Systems
@@ -520,8 +521,18 @@ void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
     // ...
 }
 ```
+### **2. Intend Handler** 
 
-### **2. Behavior Decision System** 
+The Intend Handler component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player or being hit by an attack—and to notify the State Manager to initiate a new behavioral sequence.
+
+Key Functions:
+
+- Target Detection: Scans the environment for valid targets and alerts the State Manager when a new one is found.
+
+- Event-Driven Logic: Triggers state changes based on specific gameplay events, ensuring the AI can react instantly to dynamic situations like a player getting too close or an incoming attack.
+
+
+### **3. Behavior Decision System** 
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
@@ -552,14 +563,5 @@ This system evaluates all available actions and selects the best one by assignin
 This system adds another layer of complexity by allowing the AI to dynamically choose its movement direction. The movement chain's direction (e.g., move left, move right, roll forward) is determined at runtime based on defined policies. This includes reacting to the player's last movement direction or randomizing its own movement for unpredictable behavior.
 
 
-### **3. Intend Handler** 
-
-The Intend Handler component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player or being hit by an attack—and to notify the State Manager to initiate a new behavioral sequence.
-
-Key Functions:
-
-- Target Detection: Scans the environment for valid targets and alerts the State Manager when a new one is found.
-
-- Event-Driven Logic: Triggers state changes based on specific gameplay events, ensuring the AI can react instantly to dynamic situations like a player getting too close or an incoming attack.
 
 
