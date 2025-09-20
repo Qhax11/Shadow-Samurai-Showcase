@@ -536,7 +536,7 @@ Key Functions:
 - Event-Driven Logic: Triggers state changes based on specific gameplay events, ensuring the AI can react instantly to dynamic situations like a player getting too close or an incoming attack.
 
 
-### **3. Behavior Decision System** 
+### **3. Behavior Decision** 
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
