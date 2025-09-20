@@ -482,164 +482,84 @@ https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 
 ## AI
 
- UAC_BehaviorDecision – AI Attack & Movement Decision System (Summary)
-🔹 Purpose
-This component handles attack and movement chain selection for enemy AI based on scoring logic.
-Decisions are made using distance to the player, cooldowns, behavior state, and whether the player is moving.
+Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. My journey began with traditional Behavior Trees, then moved to State Trees, and eventually a hybrid approach. However, none of these off-the-shelf solutions provided the granular control, complex data flow management, and sophisticated debugging capabilities required for the kind of dynamic AI I envisioned.
 
-- Selects the most suitable attack ability.
+Ultimately, I decided to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
+
+
+### **1. State Manager** 
+
+ he UAC_StateManager is a core component that defines and governs the distinct behavioral states of an enemy character (e.g., Idle, Patrol, Combat). This component acts as the central brain of the AI, handling state transitions and managing the flow of behavior.
+
+Unlike traditional systems where state logic is scattered across different nodes, this custom manager instantiates all possible states from a list of class references defined in a data asset. This approach ensures a modular and clean structure, where each state's logic is self-contained.
+
+Key Features:
+- State Instantiation: The manager creates a single instance for each state (UStateBase) defined in a data asset on BeginPlay.
+
+- State Transitions: The RequestStateTreeEnter function handles all state changes. It first validates the transition using an EnterCondition() check on the new state and, if successful, calls OnExit() on the current state before calling OnEnter() on the new one.
+
+- Centralized Decision-Making: UAC_StateManager delegates the decision-making process to the BehaviorDecisionComponent by calling the SelectNewBestAttack() function, ensuring a clear separation of concerns.
+
+- Dynamic Debugging: A built-in debug mode visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
 
 ```c++
-FAttackData UAC_BehaviorDecision::GetBestAttack(float DistanceToTarget)
+void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
-    if (!AttackAbilityAsset || !OwnerEnemyASC)
+    // ...
+    UStateBase* FindedState = GetStateWithTag(StateTag);
+    if (FindedState->EnterCondition())
     {
-        UE_LOG(LogTemp, Warning, TEXT("AttackAbilityAsset or OwnerEnemyASC is null in: %s !"), *GetName());
-        return FAttackData();
+        if (CurrentState)
+        {
+            CurrentState->OnExit();
+        }
+
+        FindedState->OnEnter();
+        CurrentState = FindedState;
     }
-
-    float BestScore = -FLT_MAX;
-    FAttackData BestAttack;
-
-    for (const FAttackData& Attack : AttackAbilityAsset->AttackAbilities)
-    {
-        if (!Attack.AbilityClass) 
-        {
-            continue;
-        }
-
-        bool bIsOnCooldown = OwnerEnemyASC->HasMatchingGameplayTag(Attack.AbilityCooldownTag);
-        if (bIsOnCooldown) 
-        {
-            continue;
-        }
-
-        float DistanceScore = CalculateAttackAbilityScoreBasedOnTargetDistance(DistanceToTarget, Attack.MinRange, Attack.MaxRange);
-
-        float TotalScore = Attack.ScoreBias + DistanceScore;
-
-        UE_LOG(LogTemp, Log, TEXT("[AI] Attack %s → Score: %.2f"), *Attack.AbilityClass->GetName(), TotalScore);
-
-        if (TotalScore > BestScore)
-        {
-            BestScore = TotalScore;
-            BestAttack = Attack;
-        }
-    }
-
-    LastSelectedAttackAbilityData = BestAttack;
-    return BestAttack;
+    // ...
 }
 ```
 
-- Considers cooldown status, distance, behavior modifiers, and score bias.
+### **2. Behavior Decision System** 
+
+The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
+
+- Dynamic Scoring System:
+This system evaluates all available actions and selects the best one by assigning a score to each. The score is calculated based on multiple factors, allowing the AI to make nuanced and intelligent decisions.
+
+ - GetBestAttack(float DistanceToTarget): Selects the most suitable attack ability. The score calculation for an attack is influenced by:
 
 ![image](https://github.com/user-attachments/assets/ee2008a4-0939-410b-a892-146fd0b9d1c9)
 
+ - Distance to Target: A higher score is given if the attack's effective range matches the current distance to the player.
 
-GetBestMovementChain(TSubclassOf<UGAS_GameplayAbilityBase>)
-→ Picks the best movement chain linked to the selected attack.
+ - Cooldown Status: Abilities on cooldown are given a score of negative infinity to ensure they are never selected.
 
-```c++
-TArray<FMovementAbilityData> UAC_BehaviorDecision::GetBestMovementChain(TSubclassOf<UGAS_GameplayAbilityBase> SelectedAbilityClass)
-{
-    if (!SelectedAbilityClass || !AttackAbilityMovementChainMapAsset)
-    {
-        return TArray<FMovementAbilityData>();
-    }
+ - Score Bias: A designer-adjustable value to manually prioritize certain attacks over others.
 
-    UMovementChainAsset* BestMovementChainDataAsset = nullptr;
-
-    float BestScore = -FLT_MAX;
-    float BestMovementChainDistanceScore = 0.f;
-    float BestMovementChainTargetMovementScore = 0.f;
-
-    TArray<UMovementChainAsset*> AbilityMovementChainAssets = GetMovementChainsForSelectedAttackAbility(SelectedAbilityClass);
-    for (UMovementChainAsset* MovementChainAsset : AbilityMovementChainAssets)
-    {
-        if (GetTargetDistance() < MovementChainAsset->MinRange)
-        {
-            continue;
-        }
-
-        float DistanceScore = CalculateMovementChainScoreBasedOnTargetDistance(MovementChainAsset);
-        float TargetMovementScore = CalculateMovementChainScoreBasedOnTargetMovement(MovementChainAsset);
-
-        float TotalScore = MovementChainAsset->ScoreBias + DistanceScore + TargetMovementScore;
-
-        if (TotalScore > BestScore)
-        {
-            BestScore = TotalScore;
-            BestMovementChainDistanceScore = DistanceScore;
-            BestMovementChainTargetMovementScore = TargetMovementScore;
-            BestMovementChainDataAsset = MovementChainAsset;
-        }
-    }
-
-    ApplyDirectionPoliciesToSelectedMovementChain(BestMovementChainDataAsset);
-
-    if (GEngine && EnableSelectedDebug)
-    {
-        GEngine->AddOnScreenDebugMessage(10, 3.5f, FColor::Cyan,
-            FString::Printf(TEXT(">> Selected MovementChain: %s | DistanceScore: %.1f | TargetMovementScore: %.1f "),
-                *BestMovementChainDataAsset->MovementChainName.ToString(), BestMovementChainDistanceScore, BestMovementChainTargetMovementScore));
-    }
-
-    return BestMovementChainDataAsset->MovementChain;
-}
-}
-```
-
-
-- Uses scoring based on distance, target movement, and behavior state.
+ - GetBestMovementChain(...): Picks the optimal movement chain to accompany the selected attack. This score is influenced by:
 
 ![Ekran görüntüsü 2025-04-08 203016](https://github.com/user-attachments/assets/0d3c1f2a-014f-401c-aa8c-e54f421c2181)
 
 ![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
 
+ - Distance: The score is boosted if the movement chain will put the AI in an ideal range for its next attack.
 
-ApplyDirectionPoliciesToSelectedMovementChain()
-→ Dynamically sets movement directions based on player input or randomization.
+ - Target Movement: The AI's movement score changes based on whether the player is moving, allowing the AI to react intelligently by either closing the gap or creating distance.
 
-```c++
-bool UAC_BehaviorDecision::ApplyDirectionPoliciesToSelectedMovementChain(UMovementChainAsset* SelectedMovementChainAsset)
-{
-    if (!SelectedMovementChainAsset) 
-    {
-        UE_LOG(LogTemp, Warning, TEXT("SelectedMovementChainAsset is null in: %s"), *GetName());
-        return false;
-    }
-    bool bChanged = false;
+- Direction Policies:
+This system adds another layer of complexity by allowing the AI to dynamically choose its movement direction. The movement chain's direction (e.g., move left, move right, roll forward) is determined at runtime based on defined policies. This includes reacting to the player's last movement direction or randomizing its own movement for unpredictable behavior.
 
-    FGameplayTag HeroLastDirectionGameplayTag = HeroMovementListenerComp->GetHeroLastMovementDirectionTagByLastInput();
 
-    for (FMovementAbilityData& MovementAbilityInChain : SelectedMovementChainAsset->MovementChain)
-    {
-        if (!MovementAbilityInChain.DirectionPolicyTag.IsValid()) 
-        {
-            continue;
-        }
+### **3. Intend Handler** 
 
-        if (MovementAbilityInChain.DirectionPolicyTag == GAS_Tags::TAG_AI_Direction_Policy_PlayerLastDirection)
-        {
-            if (HeroLastDirectionGameplayTag.IsValid()) 
-            {
-                MovementAbilityInChain.ResolvedDirectionTag = HeroLastDirectionGameplayTag;
-                bChanged = true;
-            }
-        }
-        else if (MovementAbilityInChain.DirectionPolicyTag == GAS_Tags::TAG_AI_Direction_Policy_Random) 
-        {
-            MovementAbilityInChain.ResolvedDirectionTag = GetRandomDirectionTag();
-            bChanged = true;
-        }
-    }
+The Intend Handler component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player or being hit by an attack—and to notify the State Manager to initiate a new behavioral sequence.
 
-    return bChanged;
-}
-```
+Key Functions:
 
-This system is designed to be used inside a State Tree, where selected abilities and movement chains are executed after decision-making.
+- Target Detection: Scans the environment for valid targets and alerts the State Manager when a new one is found.
 
-![Ekran görüntüsü 2025-04-08 203341](https://github.com/user-attachments/assets/586c8921-8f07-4097-b9c3-1969eaa7a5c0)
+- Event-Driven Logic: Triggers state changes based on specific gameplay events, ensuring the AI can react instantly to dynamic situations like a player getting too close or an incoming attack.
+
 
