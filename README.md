@@ -29,8 +29,8 @@ Gameplay video: https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eami
      - [State Manager](#1-State-Manager)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
-          - [State Manager](#1-State-Manager)
-          - [Scoring](##2-Scoring)
+          - [Services](#1-Services)
+          - [Scoring](#2-Scoring)
     
      
 
