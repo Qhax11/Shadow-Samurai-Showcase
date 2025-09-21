@@ -37,6 +37,10 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
           - [Services](#31-Services)
+               -[Service Base](#311-Service-Base)
+               -[Get Best Movement](#312-Get-Best-Movement)
+               -[Get Best Attack Base](#313-Get-Best-Attack)
+               -[Get Best IncomingAttackReaction](#314-Get-Best-IncomingAttackReaction)
           - [Scoring](#32-Scoring)
     
      
@@ -895,15 +899,60 @@ The UAC_BehaviorDecision component is the AI's tactical layer, responsible for c
 
 #### **3.1 Services** 
 
-The system is built on a service-oriented architecture, where each decision-making logic is encapsulated within its own class derived from UBehaviorDecisionServiceBase. This modular design prevents a single, cluttered component and allows for easy expansion with new AI behaviors.
+##### **3.1.1 Service Base** 
 
-- UBDS_GetBestAttack: This service is responsible for selecting the most suitable attack from a list of possibilities.
+The UBehaviorDecisionServiceBase class is the foundation for the AI's tactical decision-making system. It is a foundational abstract class designed to be inherited by specific services that handle different types of decisions, such as selecting an attack or a movement chain.
 
-- UBDS_GetBestMovementChain: This service determines the optimal movement sequence for the AI, often to accompany an attack or to reposition itself.
+The class utilizes an FBehaviorServiceInitParams struct to initialize itself. This struct provides all the necessary references (like the Enemy, EnemyController, and Hero) upon creation, ensuring that each service has access to the data it needs without having to manually find it.
 
-- UBDS_ComingAttackReactionBase: This is a base class for services that decide how the AI should react to an incoming attack, such as dodging, parrying, or blocking.
+- Core Functionality: The base class provides common helper functions that all decision-making services might need. A key example is ApplyDirectionPoliciesToMovementAbility(), which determines the AI's movement direction based on pre-defined policies, such as moving away from the player's last direction or a random direction. This approach ensures that the logic for common tasks is centralized and reusable, preventing code duplication.
 
-The UAC_BehaviorDecision component initializes these services and delegates all decision-making tasks to them, acting as the central hub for the AI's tactical choices.
+- Service-Oriented Architecture: This base class is a critical part of the system's service-oriented design. By inheriting from UBehaviorDecisionServiceBase, new decision-making services can be easily added to the AI. Each new service can implement its own specific logic while still benefiting from the shared initialization and helper functions provided by the base class. This modularity makes the system highly scalable and easy to maintain.
+
+##### **3.1.2 Get Best Movement** 
+
+The UBDS_GetBestMovementChain is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the Behavior Decision component, evaluating various movement "chains" based on a dynamic scoring system to select the most advantageous one for the current combat situation.
+
+- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential movement chain. The chain with the highest final score is chosen. The score is calculated by combining multiple factors, each handled by its own dedicated function:
+
+- Distance Scoring: CalculateMovementChainScoreBasedOnTargetDistance() evaluates how a movement chain's distance to the target affects its score. For instance, a movement chain designed for close-quarters combat might get a negative score if the enemy is far from the player, discouraging its selection. This is often handled by a curve asset, allowing for fine-grained control over the scoring.
+
+- Target Movement Scoring: CalculateMovementChainScoreBasedOnTargetMovement() adjusts the score based on whether the target (the player) is currently moving or standing still. This allows the AI to choose different movement patterns in response to a mobile or stationary player, making its behavior feel more intelligent and adaptive.
+
+- Behavior State Modifiers: CalculateMovementChainScoreBasedOnBehaviorState() incorporates the AI's current BehaviorState (e.g., Aggressive, Defensive) into the score. This allows you to create different sets of movement chains that are preferred for specific tactical situations.
+
+- Direction Policies: The ApplyDirectionPoliciesToSelectedMovementChain() function is the final step. It takes the chosen movement chain and applies a specific direction policy to each of its movement abilities. For example, a policy might dictate that the AI should always dash away from the player's last direction, making the AI's movements more unpredictable and effective.
+
+##### **3.1.2 Get Best Attack** 
+
+The UBDS_GetBestAttack is a specialized service designed to select the most optimal offensive ability for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
+
+- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential attack. The attack with the highest final score is chosen. The score is calculated by combining multiple factors:
+
+- Cooldown & Validity Check: The service first checks if an attack is on cooldown. If it is, the attack is immediately disregarded, ensuring the AI only considers abilities that are ready to use.
+
+- Distance Scoring: The CalculateAttackAbilityScoreBasedOnTargetDistance() function evaluates the attack's effectiveness based on the distance to the target. It assigns a higher score to attacks that are a more appropriate range. For instance, a melee attack will receive a high score when the AI is close to the player, while a ranged attack will get a higher score when the player is farther away.
+
+- Combo Scoring: The CalculateComboScore() function is a crucial part of the system that adds depth and fluidity to the AI's behavior. If the AI has just finished an attack that is part of a combo chain, this function gives a significant score bonus to the next logical attack in that sequence. This prevents the AI from choosing random abilities and allows it to perform coherent, multi-step attack patterns.
+
+The final score for each attack is a combination of these scores and a pre-defined ScoreBias. The service then selects the attack with the highest total score, ensuring a dynamic and intelligent choice every time.
+
+##### **3.1.4 Get Best InComingAttack Reaction** 
+
+Coming Attack Reaction Decision Service
+The UBDS_ComingAttackReactionBase is the AI's specialized defensive decision-making service. It is designed to evaluate an incoming attack and select the best possible defensive action, such as a parry, dodge, or taking damage. This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently to a player's attacks.
+
+- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential defensive reaction. The reaction with the highest final score is chosen. The score is calculated by combining multiple factors:
+
+- Behavior State Score: CalculateBehaviorStateScore() adjusts the score based on the AI's current BehaviorState (e.g., Aggressive, Defensive). This allows you to create defensive reactions that are preferred for specific tactical situations.
+
+- Tag Score: CalculateTagScore() gives a score bonus based on the tags associated with the incoming attack. For instance, an attack with a HeavyAttack tag might increase the score of a Parry reaction, while a LightAttack tag might increase the score of a Dodge reaction.
+
+- Chance Roll: The PassesFinalChanceRoll() function adds an element of unpredictability to the AI's decisions. For a Parry reaction, the chance to succeed is based on the AI's Posture value, while for a Dodge reaction, it is based on a pre-defined BaseChance. This adds depth to the system and prevents the AI from becoming too predictable.
+
+- Execution with Precision: The IsEnable() function is a critical check that ensures the AI has enough time to react. If the time to impact is less than the MinimumTimeBeforeHitToReact, the reaction is not considered, preventing the AI from attempting actions that it cannot complete in time.
+
+The final score for each reaction is a combination of these scores and a pre-defined ScoreBias. The service then selects the reaction with the highest total score, ensuring a dynamic and intelligent defensive choice every time.
 
 #### **3.2 Scoring** 
 
