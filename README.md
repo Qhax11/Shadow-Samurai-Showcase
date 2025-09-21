@@ -40,7 +40,7 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
                - [Service Base](#311-Service-Base)
                - [Get Best Movement](#312-Get-Best-Movement)
                - [Get Best Attack Base](#313-Get-Best-Attack)
-               - [Get Best IncomingAttackReaction](#314-Get-Best-IncomingAttackReaction)
+               - [Get Best IncomingAttack Reaction](#314-Get-Best-IncomingAttack-Reaction)
           - [Scoring](#32-Scoring)
     
      
