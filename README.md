@@ -35,8 +35,8 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
           - [InComingAttack State](#13-InComingAttack-State)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
-          - [Services](#31Services)
-          - [Scoring](#32Scoring)
+          - [Services](#31-Services)
+          - [Scoring](#32-Scoring)
     
      
 
