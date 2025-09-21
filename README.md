@@ -534,9 +534,131 @@ void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 
 #### **Movement** 
 
+The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement to get into the optimal position for its next action. It constantly evaluates the tactical situation and uses a sophisticated decision-making process to find the most suitable movement chain.
+
+- OnEnter: When the AI enters this state, it immediately calls the SelectNewAttackAbility() function from the Behavior Decision component to determine the best attack. This is a crucial step as it dictates which movement chain should be executed to get the AI within range for that specific attack.
+
+```c++
+void UMovementState::OnEnter_Implementation()
+{
+	Super::OnEnter_Implementation();
+	SelectedAttack = SelectNewAttackAbility();
+	if (!SelectedAttack.AbilityClass)
+	{
+		ExitRequest("SelectedAttack ability class is null");
+		return;
+	}
+	SelectedAttackCDO = SelectedAttack.AbilityClass->GetDefaultObject<UGAS_GameplayAbilityBase>();
+	StartMovementChain(SelectedAttack.AbilityClass);
+}
+```
+
+- OnTick: On every frame, the OnTick function calls TryEnterToAttackState(). This is the core of the state's logic; it continuously checks if the AI is now in range to perform the selected attack.
+
+```c++
+void UMovementState::OnTick_Implementation(float DeltaTime)
+{
+	TryEnterToAttackState();
+}
+
+void UMovementState::TryEnterToAttackState()
+{
+	if (!SelectedAttackCDO) return;
+	if (IsAttackInRange(SelectedAttack.AbilityClass))
+	{
+		MovementManagerComponent->StopMovementAbilities();
+		ExitRequest("Target is in range", GAS_Tags::TAG_AI_State_Attack);
+	}
+}
+```
+
+- StartMovementChain: The StartMovementChain function delegates the actual movement logic to the MovementManagerComponent. It also subscribes to a delegate (OnMovementChainEnded) to know when the movement sequence is complete.
+
+- Exit Logic: The state's exit logic is a clear example of the system's reactive design. The AI will exit the Movement State and request to enter the Attack State as soon as it gets within range of its selected attack. If the movement chain ends before the AI is in range, it re-evaluates and may start a new movement chain or transition to a different state.
+
+
+
 #### **Attack** 
 
+The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute the pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion.
+
+```c++
+void UAttackStateBase::OnEnter_Implementation()
+{
+	Super::OnEnter_Implementation();
+	Enemy->GetEnemyMovementManagerComponent()->StopMovementAbilities();
+	SelectAndMakeAttack();
+}
+```
+
+- OnEnter: Upon entering the AttackState, the AI immediately calls SelectAndMakeAttack(). It first gets the best attack data from the Behavior Decision component and then attempts to activate the corresponding ability. Any prior movement abilities are immediately stopped to allow the attack animation to take priority.
+  
+- Attack Execution: The MakeAttack() function uses the TryActivateAbilityByClassAndReturnInstance method to fire the attack. This method ensures that the ability is activated through the Gameplay Ability System (GAS), allowing for all the benefits of that framework (cooldowns, costs, etc.).
+
+```c++
+void UAttackStateBase::MakeAttack()
+{
+	UGAS_GameplayAbilityBase* ActivatedAbility = EnemyASC->TryActivateAbilityByClassAndReturnInstance(
+		BehaviorDecisionComponent->LastSelectedAttackAbilityData.AbilityClass);
+
+	if (ActivatedAbility)
+	{
+		if (!ActivatedAbility->OnGameplayAbilityEndedWithDataBP.IsAlreadyBound(this, &UAttackStateBase::OnAttackAbilityEnded))
+		{
+			ActivatedAbility->OnGameplayAbilityEndedWithDataBP.AddDynamic(this, &UAttackStateBase::OnAttackAbilityEnded);
+		}
+		LastUsedAttack = ActivatedAbility;
+	}
+}
+
+void UAttackStateBase::OnAttackAbilityEnded(const FAbilityEndedDataBP& DodgeAbilityEndedData)
+{
+	ExitRequest("OnAttackAbilityEnded");
+}
+```
+
+- Event-Driven Exit: The state does not rely on a tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
+
 #### **InComingAttack** 
+
+The UInComingAttackState is the AI's reactive, defensive state. It's triggered by the Intend Handler when the AI detects a significant incoming attack and must make a split-second decision on how to react.
+
+- Decision and Action: The core of this state is the SelectAndMakeInComingAttackReaction() function, which delegates the decision-making to the Behavior Decision Component. Based on the highest-scoring defensive reaction (parry, take damage, etc.), it then calls the appropriate function to execute that action.
+
+```c++
+void UInComingAttackState::OnEnter_Implementation()
+{
+    Super::OnEnter_Implementation();
+    SelectAndMakeInComingAttackReaction();
+}
+
+void UInComingAttackState::MakeTakeDamage(const UBDS_ComingAttackReactionBase* BestComingAttackReaction)
+{
+    if (DamageSubsystem)
+    {
+        if (!DamageSubsystem->OnDamageDealt.IsAlreadyBound(this, &UInComingAttackState::OnDamageDealt))
+        {
+            DamageSubsystem->OnDamageDealt.AddDynamic(this, &UInComingAttackState::OnDamageDealt);
+        }
+    }
+    // ...
+}
+
+void UInComingAttackState::MakeParryAbility(const UBDS_ComingAttackReactionBase* BestComingAttackReaction)
+{
+    UGAS_GameplayAbilityBase* ActivatedParryAbility = EnemyASC->TryActivateAbilityByClassAndReturnInstance(EnemyParryAbilityClass);
+    if (ActivatedParryAbility)
+    {
+        if (!ActivatedParryAbility->OnGameplayAbilityEndedWithDataBP.IsAlreadyBound(this, &UInComingAttackState::OnParryAbilityEnded))
+        {
+            ActivatedParryAbility->OnGameplayAbilityEndedWithDataBP.AddDynamic(this, &UInComingAttackState::OnParryAbilityEnded);
+        }
+    }
+}
+```
+- Delegates for Event Handling: The state uses delegates extensively to manage its flow. For a TakeDamage reaction, it binds to the OnDamageDealt delegate to trigger the AI's own damage-receiving ability. For a Parry reaction, it listens for the OnGameplayAbilityEndedWithDataBP delegate of the parry ability to know when it's safe to exit the state.
+
+- Execution and Transition: The MakeParryAbility() and MakeTakeDamage() functions are responsible for activating the relevant Gameplay Abilities. Once the defensive ability is complete or the damage is processed, the state calls ExitRequest, allowing the AI to seamlessly transition back to its primary combat loop (e.g., back to Movement or Attack states).
 
 ### **2. Intend Handler** 
 
