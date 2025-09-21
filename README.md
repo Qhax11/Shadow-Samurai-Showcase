@@ -37,10 +37,10 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
           - [Services](#31-Services)
-               -[Service Base](#311-Service-Base)
-               -[Get Best Movement](#312-Get-Best-Movement)
-               -[Get Best Attack Base](#313-Get-Best-Attack)
-               -[Get Best IncomingAttackReaction](#314-Get-Best-IncomingAttackReaction)
+               - [Service Base](#311-Service-Base)
+               - [Get Best Movement](#312-Get-Best-Movement)
+               - [Get Best Attack Base](#313-Get-Best-Attack)
+               - [Get Best IncomingAttackReaction](#314-Get-Best-IncomingAttackReaction)
           - [Scoring](#32-Scoring)
     
      
