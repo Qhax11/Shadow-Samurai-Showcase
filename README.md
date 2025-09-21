@@ -35,8 +35,8 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
           - [InComingAttack State](#13-InComingAttack-State)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
-          - [Services](#Services)
-          - [Scoring](#Scoring)
+          - [Services](#31Services)
+          - [Scoring](#32Scoring)
     
      
 
@@ -726,9 +726,8 @@ The UAC_BehaviorDecision component is the AI's tactical layer, responsible for c
 
 
 
-#### **Services** 
+#### **3.1 Services** 
 
-##### Core Services
 The system is built on a service-oriented architecture, where each decision-making logic is encapsulated within its own class derived from UBehaviorDecisionServiceBase. This modular design prevents a single, cluttered component and allows for easy expansion with new AI behaviors.
 
 - UBDS_GetBestAttack: This service is responsible for selecting the most suitable attack from a list of possibilities.
@@ -739,7 +738,7 @@ The system is built on a service-oriented architecture, where each decision-maki
 
 The UAC_BehaviorDecision component initializes these services and delegates all decision-making tasks to them, acting as the central hub for the AI's tactical choices.
 
-#### **Scoring** 
+#### **3.2 Scoring** 
 
 Every decision within the system is driven by a dynamic scoring mechanism. Services evaluate all available options and select the one with the highest score, which is calculated based on multiple factors.
 
