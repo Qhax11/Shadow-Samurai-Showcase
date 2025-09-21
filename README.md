@@ -498,7 +498,7 @@ Developing a robust and intelligent AI for a fast-paced combat system was one of
 Ultimately, I decided to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
 
-### **1. State Manager** 
+### **1 State Manager** 
 
  he UAC_StateManager is a core component that defines and governs the distinct behavioral states of an enemy character (e.g., Idle, Patrol, Combat). This component acts as the central brain of the AI, handling state transitions and managing the flow of behavior.
 
