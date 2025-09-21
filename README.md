@@ -30,9 +30,9 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
      - [Shadow Finisher](#3-Shadow-Finisher)
 - [AI](#AI)
      - [State Manager](#1-State-Manager)
-          - [Movement](#Movement)
-          - [Attack](#Attack)
-          - [InComingAttack](#InComingAttack)
+          - [Movement State](#1.1-Movement-State)
+          - [Attack State](#1.2-Attack-State)
+          - [InComingAttack State](#1.3-InComingAttack-State)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
           - [Services](#Services)
@@ -532,9 +532,7 @@ void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 }
 ```
 
-#### **Patrolling** 
-
-#### **Movement** 
+#### **1.1 Movement State** 
 
 The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement to get into the optimal position for its next action. It constantly evaluates the tactical situation and uses a sophisticated decision-making process to find the most suitable movement chain.
 
@@ -580,7 +578,7 @@ void UMovementState::TryEnterToAttackState()
 
 
 
-#### **Attack** 
+#### **1.2 Attack State** 
 
 The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute the pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion.
 
@@ -621,7 +619,7 @@ void UAttackStateBase::OnAttackAbilityEnded(const FAbilityEndedDataBP& DodgeAbil
 
 - Event-Driven Exit: The state does not rely on a tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
 
-#### **InComingAttack** 
+#### **1.3 InComingAttack State** 
 
 The UInComingAttackState is the AI's reactive, defensive state. It's triggered by the Intend Handler when the AI detects a significant incoming attack and must make a split-second decision on how to react.
 
