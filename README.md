@@ -30,9 +30,10 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
      - [Shadow Finisher](#3-Shadow-Finisher)
 - [AI](#AI)
      - [State Manager](#1-State-Manager)
-          - [Movement State](#11-Movement-State)
-          - [Attack State](#12-Attack-State)
-          - [InComingAttack State](#13-InComingAttack-State)
+          - [Base State](#11-Base-State)
+          - [Movement State](#12-Movement-State)
+          - [Attack State](#13-Attack-State)
+          - [InComingAttack State](#14-InComingAttack-State)
      - [Intend Handler](#2-Intend-Handler)
      - [Behavior Decision](#3-Behavior-Decision)
           - [Services](#31-Services)
@@ -498,46 +499,179 @@ Developing a robust and intelligent AI for a fast-paced combat system was one of
 Ultimately, I decided to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
 
-### **1 State Manager** 
+### **1. State Manager** 
 
- he UAC_StateManager is a core component that defines and governs the distinct behavioral states of an enemy character (e.g., Idle, Patrol, Combat). This component acts as the central brain of the AI, handling state transitions and managing the flow of behavior.
+The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
 
-Unlike traditional systems where state logic is scattered across different nodes, this custom manager instantiates all possible states from a list of class references defined in a data asset. This approach ensures a modular and clean structure, where each state's logic is self-contained.
+Key Functions and Logic:
 
-Key Features:
-- State Instantiation: The manager creates a single instance for each state (UStateBase) defined in a data asset on BeginPlay.
+- State Instantiation & Initialization: The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
 
-- State Transitions: The RequestStateTreeEnter function handles all state changes. It first validates the transition using an EnterCondition() check on the new state and, if successful, calls OnExit() on the current state before calling OnEnter() on the new one.
+```c++
+void UAC_StateManager::CreateStates()
+{
+	FStateInitParams StateInitParams = FStateInitParams(OwnerEnemyBase, OwnerController, OwnerEnemyASC, 
+		EnemyTagDelegatesComponent, BehaviorDecisionComponent, OwnerController->GetTargetActor(), 
+		Cast<UGAS_AbilitySystemComponent>(OwnerController->GetTargetHero()->GetAbilitySystemComponent()), this);
 
-- Centralized Decision-Making: UAC_StateManager delegates the decision-making process to the BehaviorDecisionComponent by calling the SelectNewBestAttack() function, ensuring a clear separation of concerns.
+	for (TSubclassOf<UStateBase> StateClass : StateClassArray)
+	{
+		if (!*StateClass)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Invalid state class in array."));
+			continue;
+		}
 
-- Dynamic Debugging: A built-in debug mode visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
+		UStateBase* NewState = NewObject<UStateBase>(this, StateClass);
+		if (!NewState || !NewState->StateTag.IsValid())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Failed to instantiate: %s"), *StateClass->GetName());
+			continue;
+		}
+
+		NewState->StateInitalize(StateInitParams);
+		StateInstances.Add(NewState);
+	}
+}
+```
+
+- State Transitions: The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
 
 ```c++
 void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
-    // ...
-    UStateBase* FindedState = GetStateWithTag(StateTag);
-    if (FindedState->EnterCondition())
-    {
-        if (CurrentState)
-        {
-            CurrentState->OnExit();
-        }
+	if (!StateTag.IsValid() || !bActive)
+	{
+		return;
+	}
 
-        FindedState->OnEnter();
-        CurrentState = FindedState;
-    }
-    // ...
+	if (bEnableDebug)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[State Manager]: %s state has been requested to enter"), *StateTag.ToString());
+	}
+
+	UStateBase* FindedState = GetStateWithTag(StateTag);
+	if (!FindedState) 
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[State Manager]: %s FindedState is null!"));
+		return;
+	}
+
+	if (FindedState->EnterCondition())
+	{
+		if (CurrentState)
+		{
+			CurrentState->OnExit();
+		}
+
+		FindedState->OnEnter();
+		CurrentState = FindedState;
+		return;
+	}
+	else
+	{
+		if (bEnableDebug)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[State Manager]: Condition of %s is false, cannot enter"), *FindedState->GetName());
+		}
+	}
+}
+
+void UAC_StateManager::RequestStateTreeExit(const FGameplayTag& StateTag, const FGameplayTag& TransactionTag, FString Reason)
+{
+	if (!StateTag.IsValid() || !bActive)
+	{
+		return;
+	}
+
+	if (bEnableDebug)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[State Manager]: %s state has been requested to exit, reason is: %s"), *StateTag.ToString(), *Reason);
+	}
+
+	UStateBase* FindedState = GetStateWithTag(StateTag);
+	if (!FindedState)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[State Manager]: %s FindedState is null!"));
+		return;
+	}
+
+	if (!FindedState->ExitCondition()) 
+	{
+		if (bEnableDebug)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[State Manager]: Condition of %s is false, cannot exit"), *StateTag.ToString());
+		}
+		return;
+	}
+
+	// If request coming with trancastion tag we directly enter
+	if (TransactionTag.IsValid()) 
+	{
+		RequestStateTreeEnter(TransactionTag);
+		return;
+	}
+
+	FAttackData NewSelectedAttack = SelectNewBestAttack();
+	if (IsAttackInRange(NewSelectedAttack.AbilityClass))
+	{
+		RequestStateTreeEnter(GAS_Tags::TAG_AI_State_Attack);
+	}
+	else
+	{
+		RequestStateTreeEnter(GAS_Tags::TAG_AI_State_Movement);
+	}
 }
 ```
 
-#### **1.1 Movement State** 
+- Delegation & Integration: The UAC_StateManager delegates all tactical and perceptual decisions to other components. For example, when it needs to choose a new attack, it calls the SelectNewBestAttack() function, which in turn relies on the BehaviorDecisionComponent to determine the highest-scoring attack.
 
-The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement to get into the optimal position for its next action. It constantly evaluates the tactical situation and uses a sophisticated decision-making process to find the most suitable movement chain.
+- Core Loop & Debugging: The TickComponent() function's only job is to call OnTick() on the current state, keeping the AI's logic updated every frame. The component also features a built-in debug mode that visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
+  
+```c++
+void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-- OnEnter: When the AI enters this state, it immediately calls the SelectNewAttackAbility() function from the Behavior Decision component to determine the best attack. This is a crucial step as it dictates which movement chain should be executed to get the AI within range for that specific attack.
+	if (CurrentState)
+	{
+		CurrentState->OnTick(DeltaTime);
 
+		if (bEnableDebug) 
+		{
+			const FVector Location = OwnerEnemyBase->GetActorLocation() + FVector(0.f, 0.f, 150.f);
+			const FString DebugText = FString::Printf(TEXT("State: %s"), *CurrentState->GetName());
+			DrawDebugString(GetWorld(), Location, DebugText, nullptr, FColor::Cyan, 0.f, true, 1.5f);
+		}
+	}
+}
+```
+
+#### **1.1 Base State** 
+
+All behavioral states inherit from the UStateBase class, a foundational C++ class that provides the common structure and lifecycle for every state. This design ensures that all states function consistently within the StateManager's framework.
+
+The class utilizes an FStateInitParams struct, which is passed to a state upon creation. This struct contains a consolidated list of key pointers—such as the Enemy, EnemyController, and BehaviorDecisionComponent—that the state will need to perform its logic. This approach prevents states from having to manually find and validate these references, ensuring a clean and reliable initialization.
+
+Key Virtual Functions:
+
+- OnEnter(): Executed immediately when the AI transitions into this state. This is where initialization logic, such as binding delegates or stopping movement, is handled.
+
+- OnTick(float DeltaTime): Called every frame while the AI is in this state. It's used for continuous checks and updates, such as monitoring distance to a target.
+
+- OnExit(): Called just before the AI leaves this state. It's responsible for cleanup logic, like unbinding delegates or resetting variables.
+
+- EnterCondition(): A virtual function that allows a state to check if the conditions are right for it to be entered. This provides an additional layer of safety for state transitions.
+
+- ExitCondition(): A virtual function that allows a state to check if the conditions are right for it to be exited.
+
+In essence, UStateBase acts as the blueprint for all AI behaviors, defining the core API that the StateManager uses to interact with and manage all the different behavioral states.
+
+#### **1.2 Movement State** 
+
+The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement, ensuring it gets into the optimal position to execute a pre-selected attack. It is highly reactive and continuously evaluates the tactical situation to find the most suitable movement chain.
+
+- OnEnter & Attack Selection: When the AI enters this state, it immediately calls SelectNewAttackAbility(). This is a crucial initial step, as the chosen attack's range directly dictates which movement chain (StartMovementChain()) the AI needs to perform.
 ```c++
 void UMovementState::OnEnter_Implementation()
 {
@@ -553,7 +687,9 @@ void UMovementState::OnEnter_Implementation()
 }
 ```
 
-- OnTick: On every frame, the OnTick function calls TryEnterToAttackState(). This is the core of the state's logic; it continuously checks if the AI is now in range to perform the selected attack.
+- Continuous Evaluation: The OnTick() function's core responsibility is to call TryEnterToAttackState() every frame. This function constantly checks if the AI has entered the attack range.
+
+- Transition Logic: The TryEnterToAttackState() function is the heart of this state. It checks if the AI is in range of its selected attack. If the condition is met, it immediately stops all movement abilities and requests to exit the Movement State and enter the Attack State, ensuring a seamless transition.
 
 ```c++
 void UMovementState::OnTick_Implementation(float DeltaTime)
@@ -572,29 +708,11 @@ void UMovementState::TryEnterToAttackState()
 }
 ```
 
-- StartMovementChain: The StartMovementChain function delegates the actual movement logic to the MovementManagerComponent. It also subscribes to a delegate (OnMovementChainEnded) to know when the movement sequence is complete.
+#### **1.3 Attack State** 
 
-- Exit Logic: The state's exit logic is a clear example of the system's reactive design. The AI will exit the Movement State and request to enter the Attack State as soon as it gets within range of its selected attack. If the movement chain ends before the AI is in range, it re-evaluates and may start a new movement chain or transition to a different state.
+The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute a pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion, ensuring a fluid and responsive combat experience.
 
-
-
-#### **1.2 Attack State** 
-
-The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute the pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion.
-
-```c++
-void UAttackStateBase::OnEnter_Implementation()
-{
-	Super::OnEnter_Implementation();
-	Enemy->GetEnemyMovementManagerComponent()->StopMovementAbilities();
-	SelectAndMakeAttack();
-}
-```
-
-- OnEnter: Upon entering the AttackState, the AI immediately calls SelectAndMakeAttack(). It first gets the best attack data from the Behavior Decision component and then attempts to activate the corresponding ability. Any prior movement abilities are immediately stopped to allow the attack animation to take priority.
-  
-- Attack Execution: The MakeAttack() function uses the TryActivateAbilityByClassAndReturnInstance method to fire the attack. This method ensures that the ability is activated through the Gameplay Ability System (GAS), allowing for all the benefits of that framework (cooldowns, costs, etc.).
-
+- OnEnter & Attack Execution: Upon entering the AttackState, the AI first calls StopMovementAbilities() to halt any ongoing movement. It then immediately calls SelectAndMakeAttack(), which attempts to activate the corresponding ability from the Gameplay Ability System (GAS).
 ```c++
 void UAttackStateBase::MakeAttack()
 {
@@ -617,14 +735,32 @@ void UAttackStateBase::OnAttackAbilityEnded(const FAbilityEndedDataBP& DodgeAbil
 }
 ```
 
-- Event-Driven Exit: The state does not rely on a tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
+- Event-Driven Exit: The state does not rely on a continuous tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
 
-#### **1.3 InComingAttack State** 
+- Dynamic Binding: The MakeAttack() function is a key part of the process. It first attempts to activate the ability and, if successful, dynamically binds a callback to the ability's OnGameplayAbilityEndedWithDataBP delegate. This ensures the OnAttackAbilityEnded() function is called at the precise moment the attack concludes.
+
+- Cleanup on Exit: The OnExit() function is crucial for preventing memory leaks and unwanted behavior. It checks if the OnAttackAbilityEnded delegate is still bound and, if so, unbinds it. It also clears the LastUsedAttack reference. This robust cleanup ensures the state is ready for its next use.
+```c++
+void UAttackStateBase::OnExit_Implementation()
+{
+	Super::OnExit_Implementation();
+
+	if (LastUsedAttack)
+	{
+		if (LastUsedAttack->OnGameplayAbilityEndedWithDataBP.IsAlreadyBound(this, &UAttackStateBase::OnAttackAbilityEnded))
+		{
+			LastUsedAttack->OnGameplayAbilityEndedWithDataBP.RemoveDynamic(this, &UAttackStateBase::OnAttackAbilityEnded);
+		}
+		LastUsedAttack = nullptr;
+	}
+}
+```
+
+#### **1.4 InComingAttack State** 
 
 The UInComingAttackState is the AI's reactive, defensive state. It's triggered by the Intend Handler when the AI detects a significant incoming attack and must make a split-second decision on how to react.
 
-- Decision and Action: The core of this state is the SelectAndMakeInComingAttackReaction() function, which delegates the decision-making to the Behavior Decision Component. Based on the highest-scoring defensive reaction (parry, take damage, etc.), it then calls the appropriate function to execute that action.
-
+- Decision and Action: The core of this state is the SelectAndMakeInComingAttackReaction() function, which delegates the decision-making to the Behavior Decision Component. Based on the highest-scoring defensive reaction (e.g., parry, take damage), it then calls the appropriate function to execute that action.
 ```c++
 void UInComingAttackState::OnEnter_Implementation()
 {
@@ -632,33 +768,66 @@ void UInComingAttackState::OnEnter_Implementation()
     SelectAndMakeInComingAttackReaction();
 }
 
-void UInComingAttackState::MakeTakeDamage(const UBDS_ComingAttackReactionBase* BestComingAttackReaction)
+bool UInComingAttackState::SelectAndMakeInComingAttackReaction()
 {
-    if (DamageSubsystem)
-    {
-        if (!DamageSubsystem->OnDamageDealt.IsAlreadyBound(this, &UInComingAttackState::OnDamageDealt))
-        {
-            DamageSubsystem->OnDamageDealt.AddDynamic(this, &UInComingAttackState::OnDamageDealt);
-        }
-    }
-    // ...
-}
+	UBDS_ComingAttackReactionBase* SelectedBestReaction = BehaviorDecisionComponent->LastSelectedComingAttackReaction;
+	if (!SelectedBestReaction) 
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SelectedBestReaction is null in: %s"), *GetName());
+		return false;
+	}
 
-void UInComingAttackState::MakeParryAbility(const UBDS_ComingAttackReactionBase* BestComingAttackReaction)
-{
-    UGAS_GameplayAbilityBase* ActivatedParryAbility = EnemyASC->TryActivateAbilityByClassAndReturnInstance(EnemyParryAbilityClass);
-    if (ActivatedParryAbility)
-    {
-        if (!ActivatedParryAbility->OnGameplayAbilityEndedWithDataBP.IsAlreadyBound(this, &UInComingAttackState::OnParryAbilityEnded))
-        {
-            ActivatedParryAbility->OnGameplayAbilityEndedWithDataBP.AddDynamic(this, &UInComingAttackState::OnParryAbilityEnded);
-        }
-    }
+	if (SelectedBestReaction->ReactionType == EComingAttackReaction::TakeDamage)
+	{
+		MakeTakeDamage(SelectedBestReaction);
+		return true;
+	}
+	else if(SelectedBestReaction->ReactionType == EComingAttackReaction::Parry)
+	{
+		MakeParryAbility(SelectedBestReaction);
+		return true;
+	}
+
+	return false;
 }
 ```
-- Delegates for Event Handling: The state uses delegates extensively to manage its flow. For a TakeDamage reaction, it binds to the OnDamageDealt delegate to trigger the AI's own damage-receiving ability. For a Parry reaction, it listens for the OnGameplayAbilityEndedWithDataBP delegate of the parry ability to know when it's safe to exit the state.
 
-- Execution and Transition: The MakeParryAbility() and MakeTakeDamage() functions are responsible for activating the relevant Gameplay Abilities. Once the defensive ability is complete or the damage is processed, the state calls ExitRequest, allowing the AI to seamlessly transition back to its primary combat loop (e.g., back to Movement or Attack states).
+- Delegates for Event Handling: The state uses delegates extensively to manage its flow. For a Take Damage reaction, it binds to the OnDamageDealt delegate to trigger the AI's own damage-receiving ability. For a Parry reaction, it listens for the OnGameplayAbilityEndedWithDataBP delegate of the parry ability to know when it's safe to exit the state.
+
+- Execution and Transition: The MakeParryAbility() and MakeTakeDamage() functions are responsible for activating the relevant Gameplay Abilities. Once the defensive ability is complete or the damage is processed, the state calls ExitRequest, allowing the AI to seamlessly transition back to its primary combat loop.
+```c++
+void UInComingAttackState::OnTakeDamageAbilityEnded(const FAbilityEndedDataBP& DodgeAbilityEndedData)
+{
+	ExitRequest("OnTakeDamageAbilityEnded");
+}
+```
+
+- Robust Cleanup: The OnExit() function is critical for maintaining a clean and bug-free system. It unbinds all delegates that were used during the state's execution, preventing unintended behavior or memory leaks. This includes delegates from the DamageSubsystem and any activated abilities, ensuring the state is fully reset and ready for its next use.
+```c++
+void UInComingAttackState::OnExit_Implementation()
+{
+	Super::OnExit_Implementation();
+
+	if (LastUsedTakeDamageAbility)
+	{
+		if (LastUsedTakeDamageAbility->OnGameplayAbilityEndedWithDataBP.IsAlreadyBound(this, &UInComingAttackState::OnTakeDamageAbilityEnded))
+		{
+			LastUsedTakeDamageAbility->OnGameplayAbilityEndedWithDataBP.RemoveDynamic(this, &UInComingAttackState::OnTakeDamageAbilityEnded);
+			UE_LOG(LogTemp, Warning, TEXT("State Manager: %s ability's end bind is removed."), *LastUsedTakeDamageAbility->GetName());
+		}
+	}
+
+	if (LastUsedParryAbility)
+	{
+		if (LastUsedParryAbility->OnGameplayAbilityEndedWithDataBP.IsAlreadyBound(this, &UInComingAttackState::OnParryAbilityEnded))
+		{
+			LastUsedParryAbility->OnGameplayAbilityEndedWithDataBP.RemoveDynamic(this, &UInComingAttackState::OnParryAbilityEnded);
+			UE_LOG(LogTemp, Warning, TEXT("State Manager: %s ability's end bind is removed."), *LastUsedParryAbility->GetName());
+		}
+	}
+}
+```
+
 
 ### **2. Intend Handler** 
 
@@ -723,8 +892,6 @@ void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReact
 ### **3. Behavior Decision** 
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
-
-
 
 #### **3.1 Services** 
 
