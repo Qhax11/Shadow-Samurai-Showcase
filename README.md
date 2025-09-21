@@ -923,7 +923,7 @@ The UBDS_GetBestMovementChain is a specialized service responsible for determini
 
 - Direction Policies: The ApplyDirectionPoliciesToSelectedMovementChain() function is the final step. It takes the chosen movement chain and applies a specific direction policy to each of its movement abilities. For example, a policy might dictate that the AI should always dash away from the player's last direction, making the AI's movements more unpredictable and effective.
 
-##### **3.1.2 Get Best Attack** 
+##### **3.1.3 Get Best Attack** 
 
 The UBDS_GetBestAttack is a specialized service designed to select the most optimal offensive ability for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
 
