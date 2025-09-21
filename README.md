@@ -1,3 +1,6 @@
+
+
+
 # Shadow-Samurai-Showcase
 
 This is a personal project built using a modified version of the [https://github.com/Qhaxi/GAS_Template-for-SinglePlayer-2D](https://github.com/Qhax11/GAS_Template-for-SinglePlayer-2D).
@@ -27,7 +30,6 @@ Gameplay video: [https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eam
      - [Shadow Finisher](#3-Shadow-Finisher)
 - [AI](#AI)
      - [State Manager](#1-State-Manager)
-          - [Patrolling](#Patrolling)
           - [Movement](#Movement)
           - [Attack](#Attack)
           - [InComingAttack](#InComingAttack)
@@ -662,14 +664,63 @@ void UInComingAttackState::MakeParryAbility(const UBDS_ComingAttackReactionBase*
 
 ### **2. Intend Handler** 
 
-The Intend Handler component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player or being hit by an attack—and to notify the State Manager to initiate a new behavioral sequence.
+The UAC_IntendHandlerBase component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player, becoming vulnerable, or detecting an incoming attack—and to notify the State Manager to initiate a new behavioral sequence.
+
+The Intend Handler achieves this by subscribing to various delegates and events, rather than constantly polling for changes. This event-driven approach is highly performant and responsive, ensuring the AI can react instantly to dynamic combat situations.
 
 Key Functions:
 
 - Target Detection: Scans the environment for valid targets and alerts the State Manager when a new one is found.
 
-- Event-Driven Logic: Triggers state changes based on specific gameplay events, ensuring the AI can react instantly to dynamic situations like a player getting too close or an incoming attack.
+```c++
+void UAC_IntendHandlerBase::OnTargetDetected(AActor* DetectedTarget)
+{
+	OwnerStateManager->OnTargetDetected();
+}
+```
+- Event-Driven State Changes: The Intend Handler is the primary trigger for reactive state transitions. It registers delegates for critical events:
 
+- Vulnerable State: When the enemy's Vulnerable tag is added (e.g., after a parry or stagger), the OnVulnerableTagAdded delegate fires, immediately pushing the AI into a Vulnerable state.
+
+```c++
+void UAC_IntendHandlerBase::OnVulnerableTagAdded(const UAbilitySystemComponent* AbilitySystemComponent, const FGameplayTag& Tag)
+{
+	OwnerStateManager->RequestStateTreeEnter(GAS_Tags::TAG_AI_State_Vulnerable);
+}
+```
+
+- Incoming Attack & Reaction Logic: This system is the AI's proactive defensive layer, managing how the AI responds to detected incoming attacks from the player. It is a critical example of the tight integration between the Intend Handler, Behavior Decision, and State Manager components.
+
+- Detection and Analysis: When the player activates a melee attack, the OnTargetAbilityActivated function within the Intend Handler processes this event. It calculates the exact ComingAttackHitTime and combines all relevant tags into a FComingAttackPayload.
+
+- Decision-Making: The Intend Handler sends this payload to the Behavior Decision Component, which uses its GetBestComingAttackReaction service to determine the highest-scoring defensive reaction (e.g., parry, take damage, etc.).
+
+- Execution with Precision: The SendEventToDefense function takes over to execute the chosen reaction. If the optimal reaction requires a specific timing (e.g., parrying a few frames before the hit), it uses a timer to delay the reaction, ensuring the AI performs the action at the precise moment for maximum effectiveness.
+
+```c++
+void UAC_IntendHandlerBase::SendEventToDefense(FComingAttackPayload EventPayload)
+{
+    UBDS_ComingAttackReactionBase* BestReaction = OwnerBehaviorDecisionComp->GetBestComingAttackReaction(EventPayload);
+    // ...
+    const float PreferredDelay = EventPayload.ComingAttackHitTime - BestReaction->PreferredTriggerTimeBeforeHit;
+    if (PreferredDelay <= 0.f)
+    {
+        TriggerIncomingAttackReaction(BestReaction, EventPayload);
+    }
+    else
+    {
+        FTimerHandle ReactionDelayTimer;
+        GetWorld()->GetTimerManager().SetTimer(ReactionDelayTimer, FTimerDelegate::CreateUObject(
+            this, &UAC_IntendHandlerBase::TriggerIncomingAttackReaction, BestReaction, EventPayload), PreferredDelay, false);
+    }
+}
+
+void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReactionBase* Reaction, FComingAttackPayload Payload)
+{
+	OwnerStateManager->ComingAttackPayload = Payload;
+	OwnerStateManager->RequestStateTreeEnter(GAS_Tags::TAG_AI_State_InComingAttack);
+}
+```
 
 ### **3. Behavior Decision** 
 
