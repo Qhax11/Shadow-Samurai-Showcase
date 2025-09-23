@@ -634,6 +634,15 @@ void UAC_StateManager::RequestStateTreeExit(const FGameplayTag& StateTag, const 
 
 - Delegation & Integration: The UAC_StateManager delegates all tactical and perceptual decisions to other components. For example, when it needs to choose a new attack, it calls the SelectNewBestAttack() function, which in turn relies on the BehaviorDecisionComponent to determine the highest-scoring attack.
 
+```c++
+FAttackData UAC_StateManager::SelectNewBestAttack()
+{
+	FAttackData NewAttackData = BehaviorDecisionComponent->GetBestAttack();
+	LastSelectedAttackData = NewAttackData;
+	return NewAttackData;
+}
+
+```
 - Core Loop & Debugging: The TickComponent() function's only job is to call OnTick() on the current state, keeping the AI's logic updated every frame. The component also features a built-in debug mode that visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
   
 ```c++
@@ -695,10 +704,7 @@ void UMovementState::OnEnter_Implementation()
 }
 ```
 
-- Continuous Evaluation: The OnTick() function's core responsibility is to call TryEnterToAttackState() every frame. This function constantly checks if the AI has entered the attack range.
-
 - Transition Logic: The TryEnterToAttackState() function is the heart of this state. It checks if the AI is in range of its selected attack. If the condition is met, it immediately stops all movement abilities and requests to exit the Movement State and enter the Attack State, ensuring a seamless transition.
-
 ```c++
 void UMovementState::OnTick_Implementation(float DeltaTime)
 {
@@ -722,6 +728,18 @@ The UAttackStateBase is where the AI's offensive actions are managed. Once the A
 
 - OnEnter & Attack Execution: Upon entering the AttackState, the AI first calls StopMovementAbilities() to halt any ongoing movement. It then immediately calls SelectAndMakeAttack(), which attempts to activate the corresponding ability from the Gameplay Ability System (GAS).
 ```c++
+void UAttackStateBase::OnEnter_Implementation()
+{
+	Super::OnEnter_Implementation(); 
+	Enemy->GetEnemyMovementManagerComponent()->StopMovementAbilities();
+	SelectAndMakeAttack();
+}
+```
+
+- Event-Driven Exit: The state does not rely on a continuous tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
+
+- Dynamic Binding: The MakeAttack() function is a key part of the process. It first attempts to activate the ability and, if successful, dynamically binds a callback to the ability's OnGameplayAbilityEndedWithDataBP delegate. This ensures the OnAttackAbilityEnded() function is called at the precise moment the attack concludes.
+```c++
 void UAttackStateBase::MakeAttack()
 {
 	UGAS_GameplayAbilityBase* ActivatedAbility = EnemyASC->TryActivateAbilityByClassAndReturnInstance(
@@ -742,10 +760,6 @@ void UAttackStateBase::OnAttackAbilityEnded(const FAbilityEndedDataBP& DodgeAbil
 	ExitRequest("OnAttackAbilityEnded");
 }
 ```
-
-- Event-Driven Exit: The state does not rely on a continuous tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
-
-- Dynamic Binding: The MakeAttack() function is a key part of the process. It first attempts to activate the ability and, if successful, dynamically binds a callback to the ability's OnGameplayAbilityEndedWithDataBP delegate. This ensures the OnAttackAbilityEnded() function is called at the precise moment the attack concludes.
 
 - Cleanup on Exit: The OnExit() function is crucial for preventing memory leaks and unwanted behavior. It checks if the OnAttackAbilityEnded delegate is still bound and, if so, unbinds it. It also clears the LastUsedAttack reference. This robust cleanup ensures the state is ready for its next use.
 ```c++
@@ -875,19 +889,34 @@ void UAC_IntendHandlerBase::OnVulnerableTagAdded(const UAbilitySystemComponent* 
 ```c++
 void UAC_IntendHandlerBase::SendEventToDefense(FComingAttackPayload EventPayload)
 {
-    UBDS_ComingAttackReactionBase* BestReaction = OwnerBehaviorDecisionComp->GetBestComingAttackReaction(EventPayload);
-    // ...
-    const float PreferredDelay = EventPayload.ComingAttackHitTime - BestReaction->PreferredTriggerTimeBeforeHit;
-    if (PreferredDelay <= 0.f)
-    {
-        TriggerIncomingAttackReaction(BestReaction, EventPayload);
-    }
-    else
-    {
-        FTimerHandle ReactionDelayTimer;
-        GetWorld()->GetTimerManager().SetTimer(ReactionDelayTimer, FTimerDelegate::CreateUObject(
-            this, &UAC_IntendHandlerBase::TriggerIncomingAttackReaction, BestReaction, EventPayload), PreferredDelay, false);
-    }
+	UBDS_ComingAttackReactionBase* BestReaction = OwnerBehaviorDecisionComp->GetBestComingAttackReaction(EventPayload);
+	if (!BestReaction) 
+	{
+		UE_LOG(LogTemp, Warning, TEXT("BestReaction is null in: %s"), *GetName());
+		return;
+	}
+
+	bool IsShadowAttack = EventPayload.ComingAttackTags.HasTagExact(GAS_Tags::TAG_Gameplay_Ability_Combat_Attack_MeleeCombo_ShadowLinked);
+	if (BestReaction->ReactionType == EComingAttackReaction::TakeDamage)
+	{
+		TriggerIncomingAttackReaction(BestReaction, EventPayload);
+		return;
+	}
+
+	const float PreferredDelay = EventPayload.ComingAttackHitTime - BestReaction->PreferredTriggerTimeBeforeHit;
+
+	if (PreferredDelay <= 0.f)
+	{
+		TriggerIncomingAttackReaction(BestReaction, EventPayload);
+	}
+	else
+	{
+		FTimerHandle ReactionDelayTimer;
+		GetWorld()->GetTimerManager().SetTimer(ReactionDelayTimer, FTimerDelegate::CreateUObject(
+			this, &UAC_IntendHandlerBase::TriggerIncomingAttackReaction, BestReaction, EventPayload), PreferredDelay, false);
+
+		UE_LOG(LogTemp, Warning, TEXT("IncomingAttack Reaction delayed by %.2f seconds."), PreferredDelay);
+	}
 }
 
 void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReactionBase* Reaction, FComingAttackPayload Payload)
@@ -918,26 +947,274 @@ The class utilizes an FBehaviorServiceInitParams struct to initialize itself. Th
 The UBDS_GetBestMovementChain is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the Behavior Decision component, evaluating various movement "chains" based on a dynamic scoring system to select the most advantageous one for the current combat situation.
 
 - Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential movement chain. The chain with the highest final score is chosen. The score is calculated by combining multiple factors, each handled by its own dedicated function:
+```c++
+UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf<UGAS_GameplayAbilityBase> SelectedAbilityClass)
+{
+    if (!SelectedAbilityClass || !AttackAbilityMovementChainMapAsset)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("SelectedAbilityClass or AttackAbilityMovementChainMapAsset is null in: %s!"), *GetName());
+        return nullptr;
+    }
+
+    UMovementChainAsset* BestMovementChainDataAsset = nullptr;
+
+    float BestScore = -FLT_MAX;
+    float BestMovementChainDistanceScore = 0.f;
+    float BestMovementChainTargetMovementScore = 0.f;
+
+    TArray<UMovementChainAsset*> AbilityMovementChainAssets = GetMovementChainsForSelectedAttackAbility(SelectedAbilityClass);
+    if (AbilityMovementChainAssets.IsEmpty())
+    {
+        return nullptr;
+    }
+
+    for (UMovementChainAsset* MovementChainAsset : AbilityMovementChainAssets)
+    {
+        if (!MovementChainAsset) 
+        {
+            continue;
+        }
+
+        float DistanceScore = CalculateMovementChainScoreBasedOnTargetDistance(MovementChainAsset);
+        float TargetMovementScore = CalculateMovementChainScoreBasedOnTargetMovement(MovementChainAsset);
+        float BehaviorStateScore = CalculateMovementChainScoreBasedOnBehaviorState(MovementChainAsset);
+
+        float TotalScore = MovementChainAsset->ScoreBias + DistanceScore + TargetMovementScore + BehaviorStateScore;
+
+        UE_LOG(LogTemp, Log, TEXT("[AI] MovementChain %s → Score: %.2f"), *MovementChainAsset->MovementChainName.ToString(), TotalScore);
+
+        if (TotalScore > BestScore)
+        {
+            BestScore = TotalScore;
+            BestMovementChainDistanceScore = DistanceScore;
+            BestMovementChainTargetMovementScore = TargetMovementScore;
+            BestMovementChainDataAsset = MovementChainAsset;
+        }
+    }
+
+    ApplyDirectionPoliciesToSelectedMovementChain(BestMovementChainDataAsset);
+    /*
+    if (GEngine && EnableSelectedDebug)
+    {
+        GEngine->AddOnScreenDebugMessage(10, 3.5f, FColor::Cyan,
+            FString::Printf(TEXT(">> Selected MovementChain: %s | DistanceScore: %.1f | TargetMovementScore: %.1f "),
+                *BestMovementChainDataAsset->MovementChainName.ToString(), BestMovementChainDistanceScore, BestMovementChainTargetMovementScore));
+    }
+    */
+    return BestMovementChainDataAsset;
+}
+```
 
 - Distance Scoring: CalculateMovementChainScoreBasedOnTargetDistance() evaluates how a movement chain's distance to the target affects its score. For instance, a movement chain designed for close-quarters combat might get a negative score if the enemy is far from the player, discouraging its selection. This is often handled by a curve asset, allowing for fine-grained control over the scoring.
+```c++
+float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnTargetDistance(UMovementChainAsset* MovementChainAsset)
+{
+    float Score = 0.0f;
+
+    if (!HeroMovementListenerComp) 
+    {
+        return Score;
+    }
+
+    const float HeroDisplacement = HeroMovementListenerComp->GetDisplacementInLastSeconds(2.0f);
+
+    if (HeroDisplacement > 50.0f)
+    {
+        Score += MovementChainAsset->ScoreModifierWhenTargetIsMoving;
+    }
+    else
+    {
+        Score += MovementChainAsset->ScoreModifierWhenTargetIsNotMoving;
+    }
+
+    // Penalty
+    if (EnemyController->GetTargetHeroDistance() < MovementChainAsset->MinRange) 
+    {
+        Score = -100.0f;
+    }
+
+    return Score;
+}
+```
 
 - Target Movement Scoring: CalculateMovementChainScoreBasedOnTargetMovement() adjusts the score based on whether the target (the player) is currently moving or standing still. This allows the AI to choose different movement patterns in response to a mobile or stationary player, making its behavior feel more intelligent and adaptive.
 
 - Behavior State Modifiers: CalculateMovementChainScoreBasedOnBehaviorState() incorporates the AI's current BehaviorState (e.g., Aggressive, Defensive) into the score. This allows you to create different sets of movement chains that are preferred for specific tactical situations.
+```c++
+float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnBehaviorState(UMovementChainAsset* MovementChainAsset)
+{
+    float Score = 0.0f;
+
+    if (!MovementChainAsset)
+    {
+        return Score;
+    }
+
+    if (const float* FoundScore = MovementChainAsset->BehaviorStateModifiers.Find(BehaviorState))
+    {
+        Score += *FoundScore;
+    }
+
+    return Score;
+}
+```
 
 - Direction Policies: The ApplyDirectionPoliciesToSelectedMovementChain() function is the final step. It takes the chosen movement chain and applies a specific direction policy to each of its movement abilities. For example, a policy might dictate that the AI should always dash away from the player's last direction, making the AI's movements more unpredictable and effective.
+```c++
+bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UMovementChainAsset* SelectedMovementChainAsset)
+{
+    if (!SelectedMovementChainAsset)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("SelectedMovementChainAsset is null in: %s"), *GetName());
+        return false;
+    }
+    bool bChanged = false;
+
+    FGameplayTag HeroLastDirectionGameplayTag = HeroMovementListenerComp->GetHeroLastMovementDirectionTagByLastInput();
+
+    for (FMovementAbilityData& MovementAbilityInChain : SelectedMovementChainAsset->MovementChain)
+    {
+        if (!MovementAbilityInChain.DirectionPolicyTag.IsValid())
+        {
+            continue;
+        }
+
+        if (MovementAbilityInChain.DirectionPolicyTag == GAS_Tags::TAG_AI_Direction_Policy_PlayerLastDirection)
+        {
+            if (HeroLastDirectionGameplayTag.IsValid())
+            {
+                MovementAbilityInChain.ResolvedDirectionTag = HeroLastDirectionGameplayTag;
+                bChanged = true;
+            }
+        }
+        else if (MovementAbilityInChain.DirectionPolicyTag == GAS_Tags::TAG_AI_Direction_Policy_Random)
+        {
+            MovementAbilityInChain.ResolvedDirectionTag = GetRandomDirectionTag();
+            bChanged = true;
+        }
+    }
+
+    return bChanged;
+}
+```
 
 ##### **3.1.3 Get Best Attack** 
 
 The UBDS_GetBestAttack is a specialized service designed to select the most optimal offensive ability for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
 
-- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential attack. The attack with the highest final score is chosen. The score is calculated by combining multiple factors:
+- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential attack. The attack with the highest final score is chosen.
+```c++
+FAttackData UBDS_GetBestAttack::GetBestAttack()
+{
+    if (!IsValid(AttackAbilityAsset) || !EnemyASC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AttackAbilityAsset or OwnerEnemyASC is null in: %s !"), *GetName());
+        return FAttackData();
+    }
+
+    float BestScore = -FLT_MAX;
+    FAttackData BestAttack;
+    float BestAttackDistanceScore = 0.f;
+
+    for (const FAttackData& Attack : AttackAbilityAsset->AttackAbilities)
+    {
+        if (!Attack.AbilityClass)
+        {
+            continue;
+        }
+
+        bool IsInCooldown = Attack.AbilityClass->GetDefaultObject<UGAS_GameplayAbilityBase>()->IsOnCooldown(EnemyASC);
+        if (IsInCooldown)
+        {
+            continue;
+        }
+
+        float DistanceScore = CalculateAttackAbilityScoreBasedOnTargetDistance(Attack, EnemyController->GetTargetHeroDistance());
+
+        float ComboScore = CalculateComboScore(Attack);
+
+        float TotalScore = Attack.ScoreBias + DistanceScore + ComboScore;
+
+        if (TotalScore > BestScore)
+        {
+            BestScore = TotalScore;
+            BestAttack = Attack;
+        }
+    }
+
+    /*
+    if (GEngine && EnableSelectedDebug)
+    {
+        GEngine->AddOnScreenDebugMessage(9, 3.5f, FColor::Red,
+            FString::Printf(TEXT(">> Selected Attack: %s | DistanceScore: %.1f"),
+                *BestAttack.AbilityClass->GetName(), BestAttackDistanceScore));
+    }
+    */
+
+    LastSelectedAttackAbilityData = BestAttack;
+    return BestAttack;
+}
+```
+ 
+ The score is calculated by combining multiple factors:
 
 - Cooldown & Validity Check: The service first checks if an attack is on cooldown. If it is, the attack is immediately disregarded, ensuring the AI only considers abilities that are ready to use.
 
 - Distance Scoring: The CalculateAttackAbilityScoreBasedOnTargetDistance() function evaluates the attack's effectiveness based on the distance to the target. It assigns a higher score to attacks that are a more appropriate range. For instance, a melee attack will receive a high score when the AI is close to the player, while a ranged attack will get a higher score when the player is farther away.
+```c++
+float UBDS_GetBestAttack::CalculateAttackAbilityScoreBasedOnTargetDistance(FAttackData AttackData, float DistanceToTarget)
+{
+    float AbilityMinRange = AttackData.AbilityClass->GetDefaultObject<UGAS_GameplayAbilityBase>()->MinRange;
+    float AbilityMaxRange = AttackData.AbilityClass->GetDefaultObject<UGAS_GameplayAbilityBase>()->MaxRange;
+    if (AbilityMaxRange <= 0.f)
+    {
+        return 0.0f;
+    }
+
+    // Ideal attack point: MaxRange
+    float DistanceFromIdeal = FMath::Abs(DistanceToTarget - AbilityMaxRange);
+
+    // Calculate the score inversely proportional to distance
+    float Score = 1.f - (DistanceFromIdeal / AbilityMaxRange);
+
+   // If the distance is BELOW the Minimum Range, apply extra penalty (optional)
+    if (DistanceToTarget < AbilityMinRange)
+    {
+        Score = -100; // Disable if too close
+    }
+
+    return Score;
+}
+```
 
 - Combo Scoring: The CalculateComboScore() function is a crucial part of the system that adds depth and fluidity to the AI's behavior. If the AI has just finished an attack that is part of a combo chain, this function gives a significant score bonus to the next logical attack in that sequence. This prevents the AI from choosing random abilities and allows it to perform coherent, multi-step attack patterns.
+```c++
+float UBDS_GetBestAttack::CalculateComboScore(FAttackData AttackData)
+{
+    // If there is no valid last attack or it wasn't part of a combo chain
+    if (!LastSelectedAttackAbilityData.AbilityClass || !LastSelectedAttackAbilityData.bIsComboAttack)
+    {
+        return 0.0f;
+    }
+
+    // If the current candidate isn't a combo attack, skip
+    if (!AttackData.bIsComboAttack)
+    {
+        return 0.0f;
+    }
+
+    // Expected combo index is always the next step after the last selected
+    int32 ExpectedNextIndex = LastSelectedAttackAbilityData.ComboIndex + 1;
+
+    // If this attack matches the expected combo step, give it a strong score
+    if (AttackData.ComboIndex == ExpectedNextIndex)
+    {
+        return 100.0f;
+    }
+
+    return 0.0f;
+}
+```
 
 The final score for each attack is a combination of these scores and a pre-defined ScoreBias. The service then selects the attack with the highest total score, ensuring a dynamic and intelligent choice every time.
 
@@ -947,14 +1224,113 @@ Coming Attack Reaction Decision Service
 The UBDS_ComingAttackReactionBase is the AI's specialized defensive decision-making service. It is designed to evaluate an incoming attack and select the best possible defensive action, such as a parry, dodge, or taking damage. This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently to a player's attacks.
 
 - Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential defensive reaction. The reaction with the highest final score is chosen. The score is calculated by combining multiple factors:
+```c++
+float UBDS_ComingAttackReactionBase::CalculateComingAttackReactionScore(FComingAttackPayload ComingAttackPayload)
+{
+    float BehaviorScore = CalculateBehaviorStateScore();
+    float TagScore = CalculateTagScore(ComingAttackPayload);
+
+    float TotalScore = BehaviorScore + TagScore + ScoreBias;
+    UE_LOG(LogTemp, Log, TEXT("[AI] Reaction %s → Score: %.2f"), *ComingAttackReactionName.ToString(), TotalScore);
+
+    return TotalScore;
+}
+```
 
 - Behavior State Score: CalculateBehaviorStateScore() adjusts the score based on the AI's current BehaviorState (e.g., Aggressive, Defensive). This allows you to create defensive reactions that are preferred for specific tactical situations.
+```c++
+float UBDS_ComingAttackReactionBase::CalculateBehaviorStateScore() const
+{
+	if (const float* Mod = BehaviorStateScoreModifiers.Find(BehaviorState))
+	{
+		return *Mod;
+	}
+
+	return 0.f;
+}
+```
 
 - Tag Score: CalculateTagScore() gives a score bonus based on the tags associated with the incoming attack. For instance, an attack with a HeavyAttack tag might increase the score of a Parry reaction, while a LightAttack tag might increase the score of a Dodge reaction.
+```c++
+float UBDS_ComingAttackReactionBase::CalculateTagScore(const FComingAttackPayload ComingAttackPayload) const
+{
+	float Score = 0.f;
+
+	for (const auto& Pair : TagScoreModifiers)
+	{
+		if (ComingAttackPayload.ComingAttackTags.HasTag(Pair.Key))
+		{
+			Score += Pair.Value;
+		}
+	}
+
+	return Score;
+}
+```
 
 - Chance Roll: The PassesFinalChanceRoll() function adds an element of unpredictability to the AI's decisions. For a Parry reaction, the chance to succeed is based on the AI's Posture value, while for a Dodge reaction, it is based on a pre-defined BaseChance. This adds depth to the system and prevents the AI from becoming too predictable.
+```c++
+bool UBDS_ComingAttackReactionBase::PassesFinalChanceRoll() const
+{
+    if (ReactionType == EComingAttackReaction::Dodge)
+    {
+        return PassesChanceRoll();
+    }
+    else if (ReactionType == EComingAttackReaction::Parry)
+    {
+        return PassesChanceRollBasedOnPosture();
+    }
+    // ReactionType == EComingAttackReaction::TakeDamage
+    else 
+    {
+        return true;
+    }
+}
+
+bool UBDS_ComingAttackReactionBase::PassesChanceRoll() const
+{
+    const float Roll = FMath::FRandRange(0.f, 1.f);  
+    const bool bPassed = Roll <= BaseChance;
+
+    UE_LOG(LogTemp, Log, TEXT("[AI] Static chance reaction %s: roll %.2f <= base chance %.2f → %s"),
+        *ComingAttackReactionName.ToString(),
+        Roll,
+        BaseChance,
+        bPassed ? TEXT("PASS") : TEXT("FAIL"));
+
+    return bPassed;
+}
+
+bool UBDS_ComingAttackReactionBase::PassesChanceRollBasedOnPosture() const
+{
+    UAS_Base* BaseAttributes = const_cast<UAS_Base*>(EnemyASC->GetSet<UAS_Base>());
+    if (!BaseAttributes)
+    {
+        return false;
+    }
+
+    const float PostureValue = BaseAttributes->GetPosture();  
+    const float Roll = FMath::FRandRange(0.f, 100.f);
+
+    const bool bPassed = Roll <= PostureValue;
+
+    UE_LOG(LogTemp, Log, TEXT("[AI] Posture-based reaction %s: roll %.2f <= posture %.2f → %s"),
+        *ComingAttackReactionName.ToString(),
+        Roll,
+        PostureValue,
+        bPassed ? TEXT("PASS") : TEXT("FAIL"));
+
+    return bPassed;
+}
+```
 
 - Execution with Precision: The IsEnable() function is a critical check that ensures the AI has enough time to react. If the time to impact is less than the MinimumTimeBeforeHitToReact, the reaction is not considered, preventing the AI from attempting actions that it cannot complete in time.
+```c++
+bool UBDS_ComingAttackReactionBase::IsEnable(FComingAttackPayload ComingAttackPayload) const
+{
+    return PassesFinalChanceRoll() && ComingAttackPayload.ComingAttackHitTime > MinimumTimeBeforeHitToReact;
+}
+```
 
 The final score for each reaction is a combination of these scores and a pre-defined ScoreBias. The service then selects the reaction with the highest total score, ensuring a dynamic and intelligent defensive choice every time.
 
