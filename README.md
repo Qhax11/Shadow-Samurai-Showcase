@@ -1,4 +1,7 @@
-# Shadow Samurai Showcase
+
+
+
+# Shadow-Samurai-Showcase
 
 This is a personal project built using a modified version of the [https://github.com/Qhaxi/GAS_Template-for-SinglePlayer-2D](https://github.com/Qhax11/GAS_Template-for-SinglePlayer-2D).
 Since it's still a work in progress, and not all systems are production-ready, the full source code is not shared publicly.
@@ -38,12 +41,13 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
                - [Attack State](#123-Attack-State)
                - [InComingAttack State](#124-InComingAttack-State)
           - [Intend Handler](#13-Intend-Handler)
-     - [The Behavior Decision and Scoring](#2-The-Behavior-Decision-and-Scoring)
-          - [Services](#21-Services)
-               - [Service Base](#211-Service-Base)
-               - [Get Best Movement](#212-Get-Best-Movement)
-               - [Get Best Attack Base](#213-Get-Best-Attack)
-               - [Get Best IncomingAttack Reaction](#214-Get-Best-IncomingAttack-Reaction)
+     - [The Behavior Decision and Scoring](#2-Behavior-Decision-and-Scoring)
+          - [Behavior Decision](#21-Behavior-Decision)
+          - [Services](#22-Services)
+               - [Service Base](#221-Service-Base)
+               - [Get Best Movement](#222-Get-Best-Movement)
+               - [Get Best Attack Base](#223-Get-Best-Attack)
+               - [Get Best IncomingAttack Reaction](#224-Get-Best-IncomingAttack-Reaction)
      - [The Execution Layer](#3-The-Execution-Layer)
           - [Movement System](#31-Get-Best-IncomingAttack-Reaction)
           - [Movement Abilities](#32-Movement-Abilities)
@@ -507,19 +511,22 @@ https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 
 
 ## AI
+
 Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. My journey began with traditional Behavior Trees, then moved to State Trees, and eventually a hybrid approach. However, none of these off-the-shelf solutions provided the granular control, complex data flow management, and sophisticated debugging capabilities required for the kind of dynamic AI I envisioned.
 
 Ultimately, I decided to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
 
-## **1. The Core Architecture and Control Flow** 
+### **1. The Core Architecture and Control Flow** 
 
-### **1.1 State Manager** 
+#### **1.1 State Manager** 
+
 The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
 
 Key Functions and Logic:
 
 - State Instantiation & Initialization: The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
+
 ```c++
 void UAC_StateManager::CreateStates()
 {
@@ -549,6 +556,7 @@ void UAC_StateManager::CreateStates()
 ```
 
 - State Transitions: The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
+
 ```c++
 void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
@@ -637,6 +645,7 @@ void UAC_StateManager::RequestStateTreeExit(const FGameplayTag& StateTag, const 
 ```
 
 - Delegation & Integration: The UAC_StateManager delegates all tactical and perceptual decisions to other components. For example, when it needs to choose a new attack, it calls the SelectNewBestAttack() function, which in turn relies on the BehaviorDecisionComponent to determine the highest-scoring attack.
+
 ```c++
 FAttackData UAC_StateManager::SelectNewBestAttack()
 {
@@ -647,6 +656,7 @@ FAttackData UAC_StateManager::SelectNewBestAttack()
 
 ```
 - Core Loop & Debugging: The TickComponent() function's only job is to call OnTick() on the current state, keeping the AI's logic updated every frame. The component also features a built-in debug mode that visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
+  
 ```c++
 void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
@@ -665,27 +675,31 @@ void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	}
 }
 ```
-### **1.2 States** 
-The entire philosophy of the custom AI system is built upon the isolation and encapsulation of behavior into distinct State objects. This approach dictates that the logic for deciding what to do and how to do it is entirely contained within the state instance itself, achieving complete decoupling from the central StateManager.
-Every action, from the most basic repositioning to the most complex counter-attack, is handled by a dedicated State. The Manager's only job is to direct control flow to the currently active State; the State, in turn, is responsible for executing its designated behavior and requesting the next necessary transition.
+#### **1.2 States** 
 
-#### **1.2.1 Base State** 
-All concrete behavioral states inherit from the UStateBase class, the foundational C++ blueprint that provides the common structure and defines the critical lifecycle for every state. This design is paramount, ensuring that all behaviors, regardless of complexity, function consistently and predictably within the central framework.
 
-The reliable execution of State logic hinges on proper initialization. This is achieved through the FStateInitParams struct, which is passed to a state upon creation. This struct contains a consolidated and pre-validated list of key pointers—such as the Enemy, EnemyController, and BehaviorDecisionComponent—that the state will need to perform its logic. This singular initialization step is vital, as it prevents states from having to manually find and validate these references during runtime, guaranteeing a clean and immediate operational readiness.
+##### **1.2.1 Base State** 
 
-The core API for interaction and management is defined by a set of Key Virtual Functions that map directly to the AI's execution cycle:
-- OnEnter(): Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
+All behavioral states inherit from the UStateBase class, a foundational C++ class that provides the common structure and lifecycle for every state. This design ensures that all states function consistently within the StateManager's framework.
 
-- OnTick(float DeltaTime): This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
+The class utilizes an FStateInitParams struct, which is passed to a state upon creation. This struct contains a consolidated list of key pointers—such as the Enemy, EnemyController, and BehaviorDecisionComponent—that the state will need to perform its logic. This approach prevents states from having to manually find and validate these references, ensuring a clean and reliable initialization.
 
-- OnExit(): Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in OnEnter() or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
+Key Virtual Functions:
 
-- EnterCondition() and ExitCondition(): These virtual functions provide an additional, powerful layer of self-governance. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
+- OnEnter(): Executed immediately when the AI transitions into this state. This is where initialization logic, such as binding delegates or stopping movement, is handled.
 
-In essence, UStateBase is the contract for behavior, defining the rigorous API that the StateManager uses to interact with and manage all the different behavioral implementations.
+- OnTick(float DeltaTime): Called every frame while the AI is in this state. It's used for continuous checks and updates, such as monitoring distance to a target.
 
-#### **1.2.2 Movement State** 
+- OnExit(): Called just before the AI leaves this state. It's responsible for cleanup logic, like unbinding delegates or resetting variables.
+
+- EnterCondition(): A virtual function that allows a state to check if the conditions are right for it to be entered. This provides an additional layer of safety for state transitions.
+
+- ExitCondition(): A virtual function that allows a state to check if the conditions are right for it to be exited.
+
+In essence, UStateBase acts as the blueprint for all AI behaviors, defining the core API that the StateManager uses to interact with and manage all the different behavioral states.
+
+##### **1.2.2 Movement State** 
+
 The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement, ensuring it gets into the optimal position to execute a pre-selected attack. It is highly reactive and continuously evaluates the tactical situation to find the most suitable movement chain.
 
 - OnEnter & Attack Selection: When the AI enters this state, it immediately calls SelectNewAttackAbility(). This is a crucial initial step, as the chosen attack's range directly dictates which movement chain (StartMovementChain()) the AI needs to perform.
@@ -722,7 +736,8 @@ void UMovementState::TryEnterToAttackState()
 }
 ```
 
-#### **1.2.3 Attack State** 
+##### **1.2.3 Attack State** 
+
 The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute a pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion, ensuring a fluid and responsive combat experience.
 
 - OnEnter & Attack Execution: Upon entering the AttackState, the AI first calls StopMovementAbilities() to halt any ongoing movement. It then immediately calls SelectAndMakeAttack(), which attempts to activate the corresponding ability from the Gameplay Ability System (GAS).
@@ -777,7 +792,8 @@ void UAttackStateBase::OnExit_Implementation()
 }
 ```
 
-#### **1.2.4 InComingAttack State** 
+##### **1.2.4 InComingAttack State** 
+
 The UInComingAttackState is the AI's reactive, defensive state. It's triggered by the Intend Handler when the AI detects a significant incoming attack and must make a split-second decision on how to react.
 
 - Decision and Action: The core of this state is the SelectAndMakeInComingAttackReaction() function, which delegates the decision-making to the Behavior Decision Component. Based on the highest-scoring defensive reaction (e.g., parry, take damage), it then calls the appropriate function to execute that action.
@@ -849,7 +865,8 @@ void UInComingAttackState::OnExit_Implementation()
 ```
 
 
-### **1.3 Intend Handler** 
+#### **1.3 Intend Handler** 
+
 The UAC_IntendHandlerBase component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player, becoming vulnerable, or detecting an incoming attack—and to notify the State Manager to initiate a new behavioral sequence.
 
 The Intend Handler achieves this by subscribing to various delegates and events, rather than constantly polling for changes. This event-driven approach is highly performant and responsive, ensuring the AI can react instantly to dynamic combat situations.
@@ -923,14 +940,16 @@ void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReact
 }
 ```
 
-### **2. The Behavior Decision and Scoring** 
+## **2. The Behavior Decision and Scoring** 
+The transition from the Control Flow (I) to this Decision Engine (II) marks the point where the AI moves from knowing what state it is in to deciding what tactical action to take next. This mechanism is the source of the AI's "intelligence," ensuring that every action is context-aware and purposeful, rather than simply randomized.
 
+### **2.1 Behavior Decision** 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
-#### **2.1 Services** 
+### **2.2 Services** 
+The tactical complexity of the AI system requires a highly modular and scalable approach to data analysis and decision-making. This is achieved through a Service-Oriented Architecture, where specific, specialized services handle distinct decision types.
 
-##### **2.1.1 Service Base** 
-
+#### **2.2.1 Service Base** 
 The UBehaviorDecisionServiceBase class is the foundation for the AI's tactical decision-making system. It is a foundational abstract class designed to be inherited by specific services that handle different types of decisions, such as selecting an attack or a movement chain.
 
 The class utilizes an FBehaviorServiceInitParams struct to initialize itself. This struct provides all the necessary references (like the Enemy, EnemyController, and Hero) upon creation, ensuring that each service has access to the data it needs without having to manually find it.
@@ -939,7 +958,7 @@ The class utilizes an FBehaviorServiceInitParams struct to initialize itself. Th
 
 - Service-Oriented Architecture: This base class is a critical part of the system's service-oriented design. By inheriting from UBehaviorDecisionServiceBase, new decision-making services can be easily added to the AI. Each new service can implement its own specific logic while still benefiting from the shared initialization and helper functions provided by the base class. This modularity makes the system highly scalable and easy to maintain.
 
-##### **2.1.2 Get Best Movement** 
+#### **2.2.2 Get Best Movement** 
 
 The UBDS_GetBestMovementChain is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the Behavior Decision component, evaluating various movement "chains" based on a dynamic scoring system to select the most advantageous one for the current combat situation.
 
@@ -1095,7 +1114,7 @@ bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UM
 }
 ```
 
-##### **2.1.3 Get Best Attack** 
+#### **2.2.3 Get Best Attack** 
 
 The UBDS_GetBestAttack is a specialized service designed to select the most optimal offensive ability for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
 
@@ -1215,7 +1234,7 @@ float UBDS_GetBestAttack::CalculateComboScore(FAttackData AttackData)
 
 The final score for each attack is a combination of these scores and a pre-defined ScoreBias. The service then selects the attack with the highest total score, ensuring a dynamic and intelligent choice every time.
 
-##### **2.1.4 Get Best InComingAttack Reaction** 
+#### **2.1.4 Get Best InComingAttack Reaction** 
 
 Coming Attack Reaction Decision Service
 The UBDS_ComingAttackReactionBase is the AI's specialized defensive decision-making service. It is designed to evaluate an incoming attack and select the best possible defensive action, such as a parry, dodge, or taking damage. This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently to a player's attacks.
