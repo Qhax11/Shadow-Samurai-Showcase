@@ -40,7 +40,7 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
                - [Movement State](#122-Movement-State)
                - [Attack State](#123-Attack-State)
                - [InComingAttack State](#124-InComingAttack-State)
-          - [Intend Handler](#12-Intend-Handler)
+          - [Intend Handler](#13-Intend-Handler)
      - [The Behavior Decision & Scoring](#2-Behavior-Decision)
           - [Services](#21-Services)
                - [Service Base](#211-Service-Base)
