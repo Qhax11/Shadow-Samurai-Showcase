@@ -939,13 +939,13 @@ void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReact
 }
 ```
 
-### **3. Behavior Decision** 
+### **2. The Behavior Decision & Scoring** 
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
-#### **3.1 Services** 
+#### **2.1 Services** 
 
-##### **3.1.1 Service Base** 
+##### **2.1.1 Service Base** 
 
 The UBehaviorDecisionServiceBase class is the foundation for the AI's tactical decision-making system. It is a foundational abstract class designed to be inherited by specific services that handle different types of decisions, such as selecting an attack or a movement chain.
 
@@ -955,7 +955,7 @@ The class utilizes an FBehaviorServiceInitParams struct to initialize itself. Th
 
 - Service-Oriented Architecture: This base class is a critical part of the system's service-oriented design. By inheriting from UBehaviorDecisionServiceBase, new decision-making services can be easily added to the AI. Each new service can implement its own specific logic while still benefiting from the shared initialization and helper functions provided by the base class. This modularity makes the system highly scalable and easy to maintain.
 
-##### **3.1.2 Get Best Movement** 
+##### **2.1.2 Get Best Movement** 
 
 The UBDS_GetBestMovementChain is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the Behavior Decision component, evaluating various movement "chains" based on a dynamic scoring system to select the most advantageous one for the current combat situation.
 
@@ -1111,7 +1111,7 @@ bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UM
 }
 ```
 
-##### **3.1.3 Get Best Attack** 
+##### **2.1.3 Get Best Attack** 
 
 The UBDS_GetBestAttack is a specialized service designed to select the most optimal offensive ability for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
 
@@ -1231,7 +1231,7 @@ float UBDS_GetBestAttack::CalculateComboScore(FAttackData AttackData)
 
 The final score for each attack is a combination of these scores and a pre-defined ScoreBias. The service then selects the attack with the highest total score, ensuring a dynamic and intelligent choice every time.
 
-##### **3.1.4 Get Best InComingAttack Reaction** 
+##### **2.1.4 Get Best InComingAttack Reaction** 
 
 Coming Attack Reaction Decision Service
 The UBDS_ComingAttackReactionBase is the AI's specialized defensive decision-making service. It is designed to evaluate an incoming attack and select the best possible defensive action, such as a parry, dodge, or taking damage. This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently to a player's attacks.
