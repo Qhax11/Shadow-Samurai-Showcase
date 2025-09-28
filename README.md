@@ -516,7 +516,9 @@ Developing a robust and intelligent AI for a fast-paced combat system was one of
 Ultimately, I decided to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
 
-### **1. State Manager** 
+### **1. The Core Architecture and Control Flow** 
+
+#### **1.1 State Manager** 
 
 The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
 
@@ -672,8 +674,10 @@ void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	}
 }
 ```
+#### **1.2 States** 
 
-#### **1.1 Base State** 
+
+##### **1.2.1 Base State** 
 
 All behavioral states inherit from the UStateBase class, a foundational C++ class that provides the common structure and lifecycle for every state. This design ensures that all states function consistently within the StateManager's framework.
 
@@ -693,7 +697,7 @@ Key Virtual Functions:
 
 In essence, UStateBase acts as the blueprint for all AI behaviors, defining the core API that the StateManager uses to interact with and manage all the different behavioral states.
 
-#### **1.2 Movement State** 
+##### **1.2.2 Movement State** 
 
 The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement, ensuring it gets into the optimal position to execute a pre-selected attack. It is highly reactive and continuously evaluates the tactical situation to find the most suitable movement chain.
 
@@ -731,7 +735,7 @@ void UMovementState::TryEnterToAttackState()
 }
 ```
 
-#### **1.3 Attack State** 
+##### **1.2.3 Attack State** 
 
 The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute a pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion, ensuring a fluid and responsive combat experience.
 
@@ -787,7 +791,7 @@ void UAttackStateBase::OnExit_Implementation()
 }
 ```
 
-#### **1.4 InComingAttack State** 
+##### **1.2.4 InComingAttack State** 
 
 The UInComingAttackState is the AI's reactive, defensive state. It's triggered by the Intend Handler when the AI detects a significant incoming attack and must make a split-second decision on how to react.
 
@@ -860,7 +864,7 @@ void UInComingAttackState::OnExit_Implementation()
 ```
 
 
-### **2. Intend Handler** 
+#### **1.3 Intend Handler** 
 
 The UAC_IntendHandlerBase component serves as the AI's perceptual layer, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player, becoming vulnerable, or detecting an incoming attack—and to notify the State Manager to initiate a new behavioral sequence.
 
