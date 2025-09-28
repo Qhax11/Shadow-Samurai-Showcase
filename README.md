@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
                - [Attack State](#123-Attack-State)
                - [InComingAttack State](#124-InComingAttack-State)
           - [Intend Handler](#13-Intend-Handler)
-     - [The Behavior Decision & Scoring](#2-Behavior-Decision-&-Scoring)
+     - [The Behavior Decision and Scoring](#2-Behavior-Decision-and-Scoring)
           - [Services](#21-Services)
                - [Service Base](#211-Service-Base)
                - [Get Best Movement](#212-Get-Best-Movement)
@@ -939,7 +939,7 @@ void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReact
 }
 ```
 
-### **2. The Behavior Decision & Scoring** 
+### **2. The Behavior Decision and Scoring** 
 
 The UAC_BehaviorDecision component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the Combat state, as triggered by the StateManager. This design ensures that the AI's actions are context-aware and purposeful.
 
