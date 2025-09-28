@@ -1384,6 +1384,16 @@ The UBDS_GetBestAttack service evaluates potential attacks by a combination of s
 - Direction Policies:
 This system adds another layer of complexity by allowing the AI to dynamically choose its movement direction. The movement chain's direction (e.g., move left, move right, roll forward) is determined at runtime based on defined policies. This includes reacting to the player's last movement direction or randomizing its own movement for unpredictable behavior.
 
+### **3. The Execution Layer** 
 
+#### **3.1 Movement System** 
 
+#### **3.2 Movement Abilities** 
 
+##### **3.2.1 Movement Base** 
+
+##### **3.2.2 Chase Target** 
+
+##### **3.2.3 Strafing** 
+
+##### **3.2.4 Patrolling** 
