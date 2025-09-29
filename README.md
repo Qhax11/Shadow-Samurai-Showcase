@@ -1,6 +1,3 @@
-
-
-
 # Shadow-Samurai-Showcase
 
 This is a personal project built using a modified version of the [https://github.com/Qhaxi/GAS_Template-for-SinglePlayer-2D](https://github.com/Qhax11/GAS_Template-for-SinglePlayer-2D).
@@ -53,13 +50,9 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
           - [Movement Abilities](#32-Movement-Abilities)
                - [Chase Target](#321-Chase-Target)
                - [Strafing](#322-Strafing)
-               - [Patrolling](#323-Patrolling)
-     - [Contextual & External Systems](#4-Movement-System)
-          - [Crowd Manager](#41-Movement-System)
+     - [Contextual and External Systems](#4-Contextual-and-External-Systems)
+          - [Crowd Manager](#41-Crowd-Manager)
          
-        
-
-
 ## Gameplay Systems
 
 ### **1. Target Lock System**
@@ -1476,3 +1469,10 @@ Movement Translation: The OnStrafingLocationQueryFinished() callback processes t
 Time-Based Termination
 Similar to the Chase Target ability, the UGA_EnemyStrafingBase is duration-controlled. The TriggerEventData->EventMagnitude sets a timer that executes OnStrafingTimeEnd(). This mechanism ensures the strafing action does not continue indefinitely, but ceases after the tactically defined period, allowing the Movement Manager to advance to the next step in the chain or request a new decision. The ability is designed to end with a cancellation (bWasCancelled=true) upon timer expiration, signaling to the Movement Manager that the sequence should not be interrupted mid-move but concluded precisely at the end of the duration.
 
+## **4. Contextual and External Systems** 
+
+### **4.1 Crowd Manager** 
+
+
+
+		  
