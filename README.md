@@ -1376,16 +1376,103 @@ The UBDS_GetBestAttack service evaluates potential attacks by a combination of s
 - Direction Policies:
 This system adds another layer of complexity by allowing the AI to dynamically choose its movement direction. The movement chain's direction (e.g., move left, move right, roll forward) is determined at runtime based on defined policies. This includes reacting to the player's last movement direction or randomizing its own movement for unpredictable behavior.
 
-### **3. The Execution Layer** 
+## **3. The Execution Layer** 
+The most robust tactical decision is worthless if the system cannot translate it into precise, reliable physical action. This layer is responsible for taking the winning Movement Chain or Attack Ability selected by the Behavior Decision component and executing it flawlessly in the game world, leveraging the power and reliability of the Gameplay Ability System (GAS).
 
 #### **3.1 Movement System** 
+The UAC_EnemyMovementManager component acts as the dedicated execution orchestrator for all AI movement. Its singular purpose is to take the high-level, scored movement decision from the BehaviorDecisionComponent and translate it into a sequence of low-level, executable GAS Abilities. This clean separation of concerns ensures that the movement logic remains tightly coupled with the core Ability System, guaranteeing reliability, replication, and precise control over movement effects.
 
-#### **3.2 Movement Abilities** 
+Movement Chain Philosophy
+The core of the system is the Movement Chain. Unlike traditional approaches that execute one movement action at a time, this system uses the FMovementChainTracker struct to manage an ordered sequence of FMovementAbilityData entries. This allows the AI to perform complex, multi-step maneuvers (like a dash followed by a strafe, followed by a final jump) as a single, atomic tactical action, rather than relying on multiple state transitions.
 
-##### **3.2.1 Movement Base** 
+Key Execution Logic
+- StartMovementChain: This is the primary entry point, called by the Movement State after the Behavior Decision component has selected the best chain based on the chosen attack.
 
-##### **3.2.2 Chase Target** 
+It first queries the BehaviorDecisionComp to receive the final, scored array of FMovementAbilityData.
+
+It initializes the MovementChainTracker with this array and calls TryExecuteNextMovementAbilityInChain().
+
+- TryExecuteNextMovementAbilityInChain: This function iterates through the active chain. If the chain is finished, it calls StopMovementAbilities() and broadcasts the OnMovementChainEnded delegate, signaling the Movement State that the tactical goal is complete and a new decision is required.
+
+If a movement ability exists in the chain, it calls TryActivateMovementAbilityWithEventData().
+
+- GAS Activation and Event Data: The system leverages FGameplayEventData to pass contextual information (like the direction tag resolved by the Decision Service) directly to the GAS ability. This ensures the ability executes exactly as intended by the decision-making layer.
+
+Upon successful activation, it dynamically binds OnMovementAbilityEnded() to the ability's delegate, establishing the crucial event-driven link required for sequence execution.
+
+- Event-Driven Advancement: The OnMovementAbilityEnded() function is the heart of the sequence control. When a movement ability completes (or is canceled):
+
+If the ability was canceled, the entire chain is terminated immediately via StopMovementAbilities(), prioritizing immediate responsiveness to interruption.
+
+If the ability completed successfully, the tracker advances its index (MovementChainTracker.Advance()) and calls TryExecuteNextMovementAbilityInChain() to initiate the next ability in the sequence.
+
+- Cancellation and Cleanup: The StopMovementAbilities() and CancelMovementAbilities() functions provide robust control. CancelMovementAbilities() specifically targets abilities with the TAG_Gameplay_Ability_Movement tag, ensuring that only movement abilities are interrupted without affecting potential concurrent abilities (e.g., Passive Effects). This ensures reliable and instantaneous stop commands when a transition to the Attack State or InComingAttack State is necessary.
+
+### **3.2 Movement Abilities** 
+The Movement Chain philosophy is only made possible by the robust, centralized logic contained within the UGA_EnemyMovementBase class. This class is the foundational GAS Ability from which all specific AI movements (chasing, strafing, etc.) inherit. It defines the core execution lifecycle and the necessary integration points with the AI Controller and Navigation System.
+
+#### **3.2.1 Movement Base** 
+This class functions as the contract for all executable movement, ensuring that every movement ability is inherently synchronized, cancellable, and integrates seamlessly with the movement chain logic managed by the UAC_EnemyMovementManager.
+
+Core Execution and Integration
+The UGA_EnemyMovementBase is an InstancedPerActor ability tagged with TAG_Gameplay_Ability_Movement, guaranteeing strict control over its execution.
+
+- Ability Activation: Upon ActivateAbility, the ability first validates its core dependencies (EnemyCharacter, EnemyController, EnemyMovementComp). Crucially, it sets the enemy's MaxWalkSpeed using the configurable MovementSpeed property. This allows designers to assign distinct, custom movement speeds to specific abilities (e.g., a "fast dash" ability vs. a "slow strafe" ability).
+
+- Move Request: The primary execution logic resides in RequestMoveToLocation and RequestMoveToTarget. These functions are responsible for packaging the movement goal—either a static world location or the player actor—into an FAIMoveRequest.
+
+The movement request uses configurable parameters like AcceptanceRadius for pathfinding and sets SetAllowPartialPath(true) to maximize the AI's adaptability in dynamic environments.
+
+Path failure is handled immediately; if the MoveTo request fails, the ability is ended with cancellation, preventing the chain from stalling.
+
+- Event-Driven Completion: Unlike tick-based movement, the ability relies entirely on the OnRequestFinished delegate of the PathFollowingComponent to know when the move is complete.
+
+The OnMoveCompleted callback processes the result. If the move was successful, it calls EndAbility(..., bWasCancelled=false), signaling a clean transition to the next ability in the chain. If the move failed or was aborted, it calls EndAbility(..., bWasCancelled=true), triggering an immediate termination of the entire movement chain.
+
+- Robust Cleanup and Safety
+The EndAbility function is critical for maintaining a clean execution context. Its robust cleanup ensures the system remains bug-free and responsive:
+
+It stops all current movement on the EnemyController.
+
+It immediately removes the binding from the PathFollowingComponent->OnRequestFinished delegate. This prevents the ability from firing the end event (or causing crashes) long after it has concluded, eliminating the risk of zombie delegates.
+
+It clears any active MovementTimerHandle instances, guaranteeing that all time-based movement logic ceases immediately.
+
+This meticulous cleanup ensures that the UGA_EnemyMovementBase is a reliable, atomic unit of action, ready to be instantiated and reused for any movement chain.
+
+#### **3.2.2 Chase Target** 
+The UGA_EnemyChaseTarget ability is the concrete implementation of the base movement system focused on immediate and persistent target acquisition. Its primary function is to direct the AI to its designated target actor (typically the player) and maintain pursuit for a tactically defined duration.
+
+- Execution and Duration Control
+This ability is activated exclusively via a GameplayEvent (TAG_AI_AbilityTriggerEvent_Movement_ChaseTarget), ensuring it is triggered precisely by the Movement Manager as part of a chain sequence.
+
+- Target Acquisition: Upon activation, it inherits the RequestMoveToTarget(AActor* TargetActor) function from the Movement Base to initiate navigation towards the player. This is a continuous pursuit, where the AI Controller constantly updates the target location.
+
+- Timed Execution: This ability introduces a crucial element of time-based control. It utilizes the TriggerEventData->EventMagnitude to set a Movement Timer.
+
+If the EventMagnitude is greater than zero, the ability sets a timer that executes the OnChaseTimeEnd() callback upon expiration.
+
+- OnChaseTimeEnd() then cleanly ends the ability, guaranteeing that the AI does not chase indefinitely but rather for the exact duration specified by the Movement Chain data asset.
+
+This time-based self-termination mechanism ensures that the Chase Target ability remains a highly modular and predictable component, allowing designers to precisely control the duration of pursuit within any complex movement sequence.
 
 ##### **3.2.3 Strafing** 
+Bu, AI'ınızın ne kadar sofistike olduğunu gösteren kritik bir yetenek. Strafing yeteneği sadece hareket etmiyor, aynı zamanda Çevresel Sorgulama Sistemini (EQS) kullanarak bilinçli bir karar veriyor ve Behavior Decision katmanından gelen kararları uyguluyor.
 
-##### **3.2.4 Patrolling** 
+Önceki bölümlerin teknik ve akıcı üslubuna uygun olarak, Strafing Base yeteneği dokümantasyonunu hazırlıyorum:
+
+3.2.2 Strafing Base
+The UGA_EnemyStrafingBase is a highly specialized movement ability that demonstrates the system's deep integration with environmental awareness and the Environmental Query System (EQS). Unlike simple pursuit, this ability's purpose is tactical repositioning and evasion, requiring the AI to find the optimal lateral position relative to the target.
+
+EQS Integration and Directional Control
+This ability is a prime example of the execution layer leveraging contextual data provided by the decision layer.
+
+Directional Input: Upon activation, the ability extracts the intended strafe direction (e.g., TAG_AI_Direction_Resolved_Left or TAG_AI_Direction_Resolved_Right) from the TriggerEventData->InstigatorTags. This tag is the definitive policy decision made by the Get Best Movement service.
+
+EQS Query Execution: The StartEQSForStrafingLocation() function translates the received direction tag into a standardized float value via ConvertStrafeDirectionTagToFloat(). This value is then passed as the StrafeDirectionParam to the designated EQSQueryTemplate. This architecture allows a single EQS template to be dynamically customized to search for a safe position specifically to the left or right of the AI.
+
+Movement Translation: The OnStrafingLocationQueryFinished() callback processes the EQS result. It retrieves the BestLocation and uses the base class's RequestMoveToLocation() function to initiate movement toward the optimal, safely queried position.
+
+Time-Based Termination
+Similar to the Chase Target ability, the UGA_EnemyStrafingBase is duration-controlled. The TriggerEventData->EventMagnitude sets a timer that executes OnStrafingTimeEnd(). This mechanism ensures the strafing action does not continue indefinitely, but ceases after the tactically defined period, allowing the Movement Manager to advance to the next step in the chain or request a new decision. The ability is designed to end with a cancellation (bWasCancelled=true) upon timer expiration, signaling to the Movement Manager that the sequence should not be interrupted mid-move but concluded precisely at the end of the duration.
+
