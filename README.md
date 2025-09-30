@@ -884,21 +884,19 @@ void UInComingAttackState::OnExit_Implementation()
 ```
 
 ### **1.3 Intend Handler** 
-The `UAC_IntendHandlerBase` component serves as the AI's `perceptual layer`, acting as a bridge between environmental stimuli and the AI's decision-making process. Its primary purpose is to identify critical moments—such as detecting a player, becoming vulnerable, or detecting an incoming attack—and to notify the `State Manager` to initiate a new behavioral sequence.
+The `UAC_IntendHandlerBase` component serves as the AI's `perceptual layer`, acting as a crucial bridge between environmental stimuli and the AI's core decision-making process. Its primary purpose is to identify critical moments such as target detection, vulnerability, or incoming attacks—and to notify the [State Manager](#11-State-Manager) to initiate a new behavioral sequence.
 
-The Intend Handler achieves this by subscribing to various delegates and events, rather than constantly polling for changes. This `event-driven approach` is highly performant and responsive, ensuring the AI can react instantly to dynamic combat situations.
+The Intend Handler achieves this by subscribing to various delegates and events, rather than constantly polling for changes. This `event-driven approach` ensures the system is `highly performant and instantly responsive` to dynamic combat situations.
 
-Key Functions:
+Core Event Triggers:
 
-- <ins>Target Detection:</ins> Scans the environment for valid targets and alerts the `State Manager` when a new one is found.
+- <ins>Target Detection:</ins> The component continuously scans the environment for valid targets. When a new target is confirmed, it alerts the `State Manager` to initiate the appropriate combat sequence, typically moving the AI out of an Idle or Patrol state.
 ```c++
 void UAC_IntendHandlerBase::OnTargetDetected(AActor* DetectedTarget)
 {
 	OwnerStateManager->OnTargetDetected();
 }
 ```
-
-- <ins>Event-Driven State Changes:</ins> The `Intend Handler` is the primary trigger for reactive state transitions. It registers delegates for critical events:
 
 - <ins>Vulnerable State:</ins> When the enemy's `Vulnerable` tag is added (e.g., after a parry or stagger), the `OnVulnerableTagAdded` delegate fires, immediately pushing the AI into a Vulnerable state.
 ```c++
@@ -908,14 +906,42 @@ void UAC_IntendHandlerBase::OnVulnerableTagAdded(const UAbilitySystemComponent* 
 }
 ```
 
--<ins> Incoming Attack & Reaction Logic:</ins> This system is the AI's proactive defensive layer, managing how the AI responds to detected incoming attacks from the player. It is a critical example of the tight integration between the `Intend Handler`, `Behavior Decision`, and `State Manager component`.
+Proactive Defense: Incoming Attack Reaction Logic
+This system serves as the AI's proactive defensive layer, managing precise reactions to detected attacks. It is a critical example of the tight integration between the `Intend Handler`, `Behavior Decision Component`, and `State Manager`. The entire flow ensures that when the AI detects an incoming attack, it calculates the optimal defensive reaction and executes it with frame precision.
 
-- <ins>Detection and Analysis:</ins> When the player activates a melee attack, the `OnTargetAbilityActivated` function within the Intend Handler processes this event. It calculates the exact ComingAttackHitTime and combines all relevant tags into a FComingAttackPayload.
+- <ins>Detection and Payload Creation:</ins> When the player initiates a melee attack, the `OnTargetAbilityActivated` function processes the event. This function's responsibility is to gather all necessary attack data—including static and dynamic `Gameplay Tags` and the crucial ComingAttackHitTime—and package them into a structured `FComingAttackPayload`. This payload contains all the intelligence required for the AI to make a defensive choice.
+```c++
+void UAC_IntendHandlerBase::OnTargetAbilityActivated(UGameplayAbility* Ability)
+{
+	if (!Ability)
+	{
+		return;
+	}
 
-- <ins>Decision-Making:</ins> The `Intend Handler` sends this payload to the Behavior Decision Component, which uses its GetBestComingAttackReaction service to determine the highest-scoring defensive reaction (e.g., parry, take damage, etc.).
+	UGA_MeleeAttackBase* MeleeAttackAbility = Cast<UGA_MeleeAttackBase>(Ability);
+	if (!MeleeAttackAbility)
+	{
+		return;
+	}
 
-- <ins>Execution with Precision:</ins> The `SendEventToDefense` function takes over to execute the chosen reaction. If the optimal reaction requires a specific timing (e.g., parrying a few frames before the hit), it uses a timer to delay the reaction, ensuring the AI performs the action at the precise moment for maximum effectiveness.
+	FGameplayTagContainer CombinedTags;
 
+	// Add static tags
+	CombinedTags.AppendTags(Ability->GetAssetTags());
+
+	// Add dynamic tags from current spec
+	if (const FGameplayAbilitySpec* Spec = Ability->GetCurrentAbilitySpec())
+	{
+		CombinedTags.AppendTags(Spec->DynamicAbilityTags);
+	}
+
+	float AttackTime = GetAttackNotifyTriggerTime(MeleeAttackAbility, CombinedTags);
+	FComingAttackPayload Payload(MeleeAttackAbility, AttackTime, CombinedTags);
+	SendEventToDefense(Payload);
+}
+```
+
+- <ins>Decision and Precision Execution:</ins> The `SendEventToDefense` function orchestrates both the final decision and the execution timing. It delegates the choice of the optimal reaction to the `Behavior Decision Component (GetBestComingAttackReaction)`. If the chosen reaction requires specific timing (e.g., parrying a few frames before the hit), the logic schedules the reaction using a `timer (SetTimer)`. This scheduling ensures the AI performs the action at the `precise moment` for maximum effectiveness, guaranteeing responsiveness that is not tied to the tick rate.
 ```c++
 void UAC_IntendHandlerBase::SendEventToDefense(FComingAttackPayload EventPayload)
 {
