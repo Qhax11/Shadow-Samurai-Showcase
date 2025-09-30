@@ -520,6 +520,12 @@ My journey to this final system began by experimenting with off-the-shelf soluti
 
 However, none of these provided the necessary granular control, complex data flow management, and sophisticated debugging capabilities required. Ultimately, this led to the decision to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
+In this section, I detail the architectural evolution and the fundamental structure of the AI system. This architecture is built around two primary custom classes that provide the necessary control and modularity:
+
+- State Manager (UAC_StateManager): The central component responsible for orchestrating the overall control flow and managing transitions between states.
+
+- State Classes (UStateBase): Individual, self-contained modules responsible for executing the specific behavior logic of the AI (e.g., Attack, Movement, InComingAttack).
+
 ### **1.1 State Manager** 
 The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
 
@@ -594,7 +600,8 @@ void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 		}
 	}
 }
-
+```
+```c++
 void UAC_StateManager::RequestStateTreeExit(const FGameplayTag& StateTag, const FGameplayTag& TransactionTag, FString Reason)
 {
 	if (!StateTag.IsValid() || !bActive)
@@ -638,36 +645,6 @@ void UAC_StateManager::RequestStateTreeExit(const FGameplayTag& StateTag, const 
 	else
 	{
 		RequestStateTreeEnter(GAS_Tags::TAG_AI_State_Movement);
-	}
-}
-```
-
-- Delegation & Integration: The UAC_StateManager delegates all tactical and perceptual decisions to other components. For example, when it needs to choose a new attack, it calls the SelectNewBestAttack() function, which in turn relies on the BehaviorDecisionComponent to determine the highest-scoring attack.
-```c++
-FAttackData UAC_StateManager::SelectNewBestAttack()
-{
-	FAttackData NewAttackData = BehaviorDecisionComponent->GetBestAttack();
-	LastSelectedAttackData = NewAttackData;
-	return NewAttackData;
-}
-```
-
-- Core Loop & Debugging: The TickComponent() function's only job is to call OnTick() on the current state, keeping the AI's logic updated every frame. The component also features a built-in debug mode that visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
-```c++
-void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	if (CurrentState)
-	{
-		CurrentState->OnTick(DeltaTime);
-
-		if (bEnableDebug) 
-		{
-			const FVector Location = OwnerEnemyBase->GetActorLocation() + FVector(0.f, 0.f, 150.f);
-			const FString DebugText = FString::Printf(TEXT("State: %s"), *CurrentState->GetName());
-			DrawDebugString(GetWorld(), Location, DebugText, nullptr, FColor::Cyan, 0.f, true, 1.5f);
-		}
 	}
 }
 ```
