@@ -907,6 +907,7 @@ void UAC_IntendHandlerBase::OnVulnerableTagAdded(const UAbilitySystemComponent* 
 ```
 
 Proactive Defense: Incoming Attack Reaction Logic
+
 This system serves as the AI's proactive defensive layer, managing precise reactions to detected attacks. It is a critical example of the tight integration between the `Intend Handler`, `Behavior Decision Component`, and `State Manager`. The entire flow ensures that when the AI detects an incoming attack, it calculates the optimal defensive reaction and executes it with frame precision.
 
 - <ins>Detection and Payload Creation:</ins> When the player initiates a melee attack, the `OnTargetAbilityActivated` function processes the event. This function's responsibility is to gather all necessary attack data—including static and dynamic `Gameplay Tags` and the crucial ComingAttackHitTime—and package them into a structured `FComingAttackPayload`. This payload contains all the intelligence required for the AI to make a defensive choice.
