@@ -505,13 +505,13 @@ https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 ## AI
 Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. To meet the demands of dynamic combat and achieve granular control, I created a custom, data-driven system. This architecture provides several key advantages:
 
-- **Granular Control:** Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
+- *Granular Control:* Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
 
-- **Modular Behavior:** Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
+- *Modular Behavior:* Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
 
-- **Data-Driven Transitions:** All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
+- *Data-Driven Transitions:* All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
 
-- **Clean Flow:** The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
+- *Clean Flow:* The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
 
 This section details the custom architecture I developed, starting with the evolution of my AI design philosophy and the core structure that governs the enemy's behavior.
 
