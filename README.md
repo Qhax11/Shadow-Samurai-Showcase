@@ -505,13 +505,13 @@ https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 ## AI
 Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. To meet the demands of dynamic combat and achieve granular control, I created a custom, data-driven system. This architecture provides several key advantages:
 
-- Granular Control: Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
+- **Granular Control:** Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
 
-- Modular Behavior: Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
+- **Modular Behavior:** Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
 
-- Data-Driven Transitions: All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
+- **Data-Driven Transitions:** All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
 
-- Clean Flow: The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
+- **Clean Flow:** The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
 
 This section details the custom architecture I developed, starting with the evolution of my AI design philosophy and the core structure that governs the enemy's behavior.
 
@@ -522,16 +522,16 @@ However, none of these provided the necessary granular control, complex data flo
 
 In this section, I detail the architectural evolution and the fundamental structure of the AI system. This architecture is built around two primary custom classes that provide the necessary control and modularity:
 
-- State Manager (UAC_StateManager): The central component responsible for orchestrating the overall control flow and managing transitions between states.
+- **State Manager (UAC_StateManager):** The central component responsible for orchestrating the overall control flow and managing transitions between states.
 
-- State Classes (UStateBase): Individual, self-contained modules responsible for executing the specific behavior logic of the AI (e.g., Attack, Movement, InComingAttack).
+- **State Classes (UStateBase):** Individual, self-contained modules responsible for executing the specific behavior logic of the AI (e.g., Attack, Movement, InComingAttack).
 
 ### **1.1 State Manager** 
 The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
 
 Key Functions and Logic:
 
-- State Instantiation & Initialization: The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
+- **State Instantiation & Initialization:** The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
 ```c++
 void UAC_StateManager::CreateStates()
 {
@@ -560,7 +560,7 @@ void UAC_StateManager::CreateStates()
 }
 ```
 
-- State Transitions: The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
+- **State Transitions:** The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
 ```c++
 void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
@@ -655,16 +655,41 @@ The entire philosophy of the custom AI system is built upon the isolation and en
 #### **1.2.1 Base State** 
 All concrete behavioral states inherit from the UStateBase class, the foundational C++ blueprint that provides the common structure and defines the critical lifecycle for every state. This design is paramount, ensuring that all behaviors, regardless of complexity, function consistently and predictably within the central framework.
 
-The reliable execution of State logic hinges on proper initialization. This is achieved through the FStateInitParams struct, which is passed to a state upon creation. This struct contains a consolidated and pre-validated list of key pointers—such as the Enemy, EnemyController, and BehaviorDecisionComponent—that the state will need to perform its logic. This singular initialization step is vital, as it prevents states from having to manually find and validate these references during runtime, guaranteeing a clean and immediate operational readiness.
+The reliable execution of State logic hinges on proper initialization. This is achieved through the FStateInitParams struct, which is passed to a state upon creation. This struct contains a consolidated and pre validated list of key pointers such as the Enemy, EnemyController, and BehaviorDecisionComponent that the state will need to perform its logic. This singular initialization step is vital, as it prevents states from having to manually find and validate these references during runtime, guaranteeing a clean and immediate operational readiness.
+```c++
+USTRUCT()
+struct FStateInitParams
+{
+    GENERATED_BODY()
+
+public:
+    // Core character references
+    UPROPERTY()
+    AGAS_EnemyBase* Enemy = nullptr;
+    UPROPERTY()
+    AAIControllerBase* EnemyController = nullptr;
+    UPROPERTY()
+    UGAS_AbilitySystemComponent* EnemyASC = nullptr;
+
+    // Specialized component and target references
+    UPROPERTY()
+    UAC_BehaviorDecision* BehaviorDecisionComponent = nullptr;
+    UPROPERTY()
+    AActor* HeroTarget = nullptr;
+    UPROPERTY()
+    UGAS_AbilitySystemComponent* HeroTargetASC = nullptr;
+    // ... (rest of the struct body)
+};
+```
 
 The core API for interaction and management is defined by a set of Key Virtual Functions that map directly to the AI's execution cycle:
-- OnEnter(): Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
+- **OnEnter():** Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
 
-- OnTick(float DeltaTime): This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
+- **OnTick(float DeltaTime):** This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
 
-- OnExit(): Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in OnEnter() or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
+- **OnExit():** Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in OnEnter() or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
 
-- EnterCondition() and ExitCondition(): These virtual functions provide an additional, powerful layer of self-governance. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
+- **EnterCondition() and ExitCondition():** These virtual functions provide an additional, powerful layer of self-governance. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
 
 In essence, UStateBase is the contract for behavior, defining the rigorous API that the StateManager uses to interact with and manage all the different behavioral implementations.
 
