@@ -1250,7 +1250,7 @@ float UBDS_GetBestAttack::CalculateComboScore(FAttackData AttackData)
 
 The final score for each attack is a combination of these scores and a pre-defined ScoreBias. The service then selects the attack with the highest total score, ensuring a dynamic and intelligent choice every time.
 
-#### **2.1.4 Get Best InComingAttack Reaction** 
+#### **2.2.4 Get Best InComingAttack Reaction** 
 
 Coming Attack Reaction Decision Service
 The `UBDS_ComingAttackReactionBase` is the AI's specialized defensive decision-making service. It is designed to evaluate an incoming attack and select the `best possible defensive action`, such as a `parry`, `dodge`, or `taking damage`. This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently to a player's attacks.
