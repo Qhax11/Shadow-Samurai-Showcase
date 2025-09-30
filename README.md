@@ -1456,9 +1456,6 @@ If the EventMagnitude is greater than zero, the ability sets a timer that execut
 This time-based self-termination mechanism ensures that the Chase Target ability remains a highly modular and predictable component, allowing designers to precisely control the duration of pursuit within any complex movement sequence.
 
 #### **3.2.3 Strafing** 
-Bu, AI'ınızın ne kadar sofistike olduğunu gösteren kritik bir yetenek. Strafing yeteneği sadece hareket etmiyor, aynı zamanda Çevresel Sorgulama Sistemini (EQS) kullanarak bilinçli bir karar veriyor ve Behavior Decision katmanından gelen kararları uyguluyor.
-
-Önceki bölümlerin teknik ve akıcı üslubuna uygun olarak, Strafing Base yeteneği dokümantasyonunu hazırlıyorum:
 
 3.2.2 Strafing Base
 The UGA_EnemyStrafingBase is a highly specialized movement ability that demonstrates the system's deep integration with environmental awareness and the Environmental Query System (EQS). Unlike simple pursuit, this ability's purpose is tactical repositioning and evasion, requiring the AI to find the optimal lateral position relative to the target.
