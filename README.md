@@ -503,7 +503,7 @@ https://github.com/user-attachments/assets/f8cd5cb3-24e0-4640-a64c-c19014647c26
 https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 
 ## AI
-Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. To meet the demands of dynamic combat and achieve granular control, I created a custom, data-driven system. This architecture provides several key advantages:
+`Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project.` To meet the demands of dynamic combat and achieve granular control, I created a custom, data-driven system. This architecture provides several key advantages:
 
 - <ins>Granular Control:</ins> Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
 
@@ -511,14 +511,14 @@ Developing a robust and intelligent AI for a fast-paced combat system was one of
 
 - <ins>Data-Driven Transitions:</ins> All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
 
-- <ins>Clean Flow:</ins> The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
+- <ins>Clean Flow:</ins> The system separates the `Control Flow (Manager)` from the `Behavior Logic (States)`, resulting in a cleaner and more maintainable codebase.
 
 This section details the custom architecture I developed, starting with the evolution of my AI design philosophy and the core structure that governs the enemy's behavior.
 
 ## **1. The Core Architecture and Control Flow** 
-My journey to this final system began by experimenting with off-the-shelf solutions. I started with traditional Behavior Trees, which offered flexibility but quickly became unwieldy for managing complex data flow in combat. I then moved to State Trees, which improved structure but still fell short on scalability. Eventually, I explored a hybrid approach, attempting to combine the strengths of both.
+My journey to this final system began by experimenting with off-the-shelf solutions. I started with traditional `Behavior Trees`, which offered flexibility but quickly became unwieldy for managing complex data flow in combat. I then moved to `State Trees`, which improved structure but still fell short on scalability. Eventually, I explored a `hybrid approach`, attempting to combine the strengths of both.
 
-However, none of these provided the necessary granular control, complex data flow management, and sophisticated debugging capabilities required. Ultimately, this led to the decision to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
+However, none of these provided the necessary granular control, complex data flow management, and sophisticated debugging capabilities required. Ultimately, this led to the decision to build a `custom, data-driven state machine` to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
 In this section, I detail the architectural evolution and the fundamental structure of the AI system. This architecture is built around two primary custom classes that provide the necessary control and modularity:
 
@@ -531,7 +531,7 @@ The UAC_StateManager component serves as the core of the AI's behavioral system,
 
 Key Functions and Logic:
 
-- <ins>State Instantiation & Initialization:</ins> The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
+- <ins>State Instantiation & Initialization:</ins> The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single `FStateInitParams` struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
 ```c++
 void UAC_StateManager::CreateStates()
 {
@@ -560,7 +560,7 @@ void UAC_StateManager::CreateStates()
 }
 ```
 
-- <ins>State Transitions:</ins> The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
+- <ins>State Transitions:</ins> The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the `EnterCondition()` and `ExitCondition()` checks on the new and current states, respectively. If the checks pass, the manager correctly calls `OnExit()` on the old state before calling `OnEnter()` on the new one, ensuring a clean and safe transition.
 ```c++
 void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
@@ -682,12 +682,12 @@ public:
 };
 ```
 
-The core API for interaction and management is defined by a set of Key Virtual Functions that map directly to the AI's execution cycle:
+The core API for interaction and management is defined by a set of `Key Virtual Functions` that map directly to the AI's execution cycle:
 - <ins>OnEnter():</ins> Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
 
 - <ins>OnTick(float DeltaTime):</ins> This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
 
-- <ins>OnExit():</ins> Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in OnEnter() or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
+- <ins>OnExit():</ins> Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in `OnEnter()` or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
 
 - <ins>EnterCondition() and ExitCondition():</ins> These virtual functions provide an additional, powerful layer of self-governance. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
 
