@@ -507,7 +507,7 @@ Developing a robust and intelligent AI for a fast-paced combat system was one of
 
 - <ins>Granular Control:</ins> Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
 
-- *Modular Behavior:* Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
+- `Modular Behavior:` Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
 
 - *Data-Driven Transitions:* All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
 
