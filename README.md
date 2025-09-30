@@ -713,7 +713,7 @@ void UMovementState::OnEnter_Implementation()
 }
 ```
 
-- The `StartMovementChain()` function is responsible for initiating the movement sequence and dynamically `binding a completion callback`. It calls the Movement Manager to start the chain and then binds `OnMovementChainEnded` to the manager's delegate. This dynamic binding ensures the `UMovementState` is notified the moment the AI reaches its target or the movement fails.
+- <ins>Movement Delegation:</ins> The `StartMovementChain()` function is responsible for initiating the movement sequence and dynamically `binding a completion callback`. It calls the [Movement Manager](#3.1-Movement-System) to start the chain and then binds `OnMovementChainEnded` to the manager's delegate. This dynamic binding ensures the `UMovementState` is notified the moment the AI reaches its target or the movement fails.
 ```c++
 void UMovementState::StartMovementChain(TSubclassOf<class UGAS_GameplayAbilityBase> SelectedAttackAbilityClass)
 {
