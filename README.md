@@ -502,14 +502,23 @@ https://github.com/user-attachments/assets/f8cd5cb3-24e0-4640-a64c-c19014647c26
 
 https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 
-
 ## AI
-Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. My journey began with traditional Behavior Trees, then moved to State Trees, and eventually a hybrid approach. However, none of these off-the-shelf solutions provided the granular control, complex data flow management, and sophisticated debugging capabilities required for the kind of dynamic AI I envisioned.
+Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project. To meet the demands of dynamic combat and achieve granular control, I created a custom, data-driven system. This architecture provides several key advantages:
 
-Ultimately, I decided to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
+- Granular Control: Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
 
+- Modular Behavior: Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
+
+- Data-Driven Transitions: All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
+
+- Clean Flow: The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
+
+This section details the custom architecture I developed, starting with the evolution of my AI design philosophy and the core structure that governs the enemy's behavior.
 
 ## **1. The Core Architecture and Control Flow** 
+My journey to this final system began by experimenting with off-the-shelf solutions. I started with traditional Behavior Trees, which offered flexibility but quickly became unwieldy for managing complex data flow in combat. I then moved to State Trees, which improved structure but still fell short on scalability. Eventually, I explored a hybrid approach, attempting to combine the strengths of both.
+
+However, none of these provided the necessary granular control, complex data flow management, and sophisticated debugging capabilities required. Ultimately, this led to the decision to build a custom, data-driven state machine to achieve 100% control over the AI's behavior. This system allows for precise management of complex states and transitions, ensuring the AI can make intelligent, context-aware decisions in combat, leading to a more challenging and engaging gameplay experience.
 
 ### **1.1 State Manager** 
 The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
@@ -517,7 +526,6 @@ The UAC_StateManager component serves as the core of the AI's behavioral system,
 Key Functions and Logic:
 
 - State Instantiation & Initialization: The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
-
 ```c++
 void UAC_StateManager::CreateStates()
 {
@@ -547,7 +555,6 @@ void UAC_StateManager::CreateStates()
 ```
 
 - State Transitions: The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
-
 ```c++
 void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
@@ -636,7 +643,6 @@ void UAC_StateManager::RequestStateTreeExit(const FGameplayTag& StateTag, const 
 ```
 
 - Delegation & Integration: The UAC_StateManager delegates all tactical and perceptual decisions to other components. For example, when it needs to choose a new attack, it calls the SelectNewBestAttack() function, which in turn relies on the BehaviorDecisionComponent to determine the highest-scoring attack.
-
 ```c++
 FAttackData UAC_StateManager::SelectNewBestAttack()
 {
@@ -644,10 +650,9 @@ FAttackData UAC_StateManager::SelectNewBestAttack()
 	LastSelectedAttackData = NewAttackData;
 	return NewAttackData;
 }
-
 ```
+
 - Core Loop & Debugging: The TickComponent() function's only job is to call OnTick() on the current state, keeping the AI's logic updated every frame. The component also features a built-in debug mode that visually displays the AI's current state in real-time within the world, a crucial feature for a complex system.
-  
 ```c++
 void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
@@ -666,6 +671,7 @@ void UAC_StateManager::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	}
 }
 ```
+
 ### **1.2 States** 
 The entire philosophy of the custom AI system is built upon the isolation and encapsulation of behavior into distinct State objects. This approach dictates that the logic for deciding what to do and how to do it is entirely contained within the state instance itself, achieving complete decoupling from the central StateManager. Every action, from the most basic repositioning to the most complex counter-attack, is handled by a dedicated State. The Manager's only job is to direct control flow to the currently active State; the State, in turn, is responsible for executing its designated behavior and requesting the next necessary transition.
 
