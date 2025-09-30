@@ -507,11 +507,11 @@ Developing a robust and intelligent AI for a fast-paced combat system was one of
 
 - <ins>Granular Control:</ins> Offers 100% control over the enemy's decision-making process, ensuring intelligent, context-aware actions in combat.
 
-- `Modular Behavior:` Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
+- <ins>Modular Behavior:</ins> Utilizes a custom State Machine framework, where individual behaviors are self-contained and easily modified or extended.
 
-- *Data-Driven Transitions:* All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
+- <ins>Data-Driven Transitions:</ins> All state changes are managed by external data assets, simplifying debugging and balancing across various enemy types.
 
-- *Clean Flow:* The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
+- <ins>Clean Flow:</ins> The system separates the Control Flow (Manager) from the Behavior Logic (States), resulting in a cleaner and more maintainable codebase.
 
 This section details the custom architecture I developed, starting with the evolution of my AI design philosophy and the core structure that governs the enemy's behavior.
 
@@ -522,16 +522,16 @@ However, none of these provided the necessary granular control, complex data flo
 
 In this section, I detail the architectural evolution and the fundamental structure of the AI system. This architecture is built around two primary custom classes that provide the necessary control and modularity:
 
-- **State Manager (UAC_StateManager):** The central component responsible for orchestrating the overall control flow and managing transitions between states.
+- <ins>State Manager (UAC_StateManager):</ins> The central component responsible for orchestrating the overall control flow and managing transitions between states.
 
-- **State Classes (UStateBase):** Individual, self-contained modules responsible for executing the specific behavior logic of the AI (e.g., Attack, Movement, InComingAttack).
+- <ins>State Classes (UStateBase):</ins> Individual, self-contained modules responsible for executing the specific behavior logic of the AI (e.g., Attack, Movement, InComingAttack).
 
 ### **1.1 State Manager** 
 The UAC_StateManager component serves as the core of the AI's behavioral system, acting as a custom state machine that orchestrates all of the enemy character's actions. Unlike traditional systems with hard-coded state logic, this manager handles state transitions and manages the flow of behavior by creating and running instances of the UStateBase class. This approach ensures a modular and clean structure, where each state's logic is entirely self-contained.
 
 Key Functions and Logic:
 
-- **State Instantiation & Initialization:** The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
+- <ins>State Instantiation & Initialization:</ins> The manager takes a list of state classes from a data asset and creates a single instance of each at BeginPlay. These instances are then initialized with a single FStateInitParams struct that contains references to all other necessary components, ensuring the states have access to everything they need to function.
 ```c++
 void UAC_StateManager::CreateStates()
 {
@@ -560,7 +560,7 @@ void UAC_StateManager::CreateStates()
 }
 ```
 
-- **State Transitions:** The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
+- <ins>State Transitions:</ins> The RequestStateTreeEnter() and RequestStateTreeExit() functions are the sole entry points for changing states. They validate the transition using the EnterCondition() and ExitCondition() checks on the new and current states, respectively. If the checks pass, the manager correctly calls OnExit() on the old state before calling OnEnter() on the new one, ensuring a clean and safe transition.
 ```c++
 void UAC_StateManager::RequestStateTreeEnter(const FGameplayTag& StateTag)
 {
@@ -683,20 +683,20 @@ public:
 ```
 
 The core API for interaction and management is defined by a set of Key Virtual Functions that map directly to the AI's execution cycle:
-- **OnEnter():** Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
+- <ins>OnEnter():</ins> Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
 
-- **OnTick(float DeltaTime):** This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
+- <ins>OnTick(float DeltaTime):</ins> This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
 
-- **OnExit():** Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in OnEnter() or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
+- <ins>OnExit():</ins> Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in OnEnter() or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
 
-- **EnterCondition() and ExitCondition():** These virtual functions provide an additional, powerful layer of self-governance. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
+- <ins>EnterCondition() and ExitCondition():</ins> These virtual functions provide an additional, powerful layer of self-governance. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
 
 In essence, UStateBase is the contract for behavior, defining the rigorous API that the StateManager uses to interact with and manage all the different behavioral implementations.
 
 #### **1.2.2 Movement State** 
 The UMovementState is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement, ensuring it gets into the optimal position to execute a pre-selected attack. It is highly reactive and continuously evaluates the tactical situation to find the most suitable movement chain.
 
-- OnEnter & Attack Selection: When the AI enters this state, it immediately calls SelectNewAttackAbility(). This is a crucial initial step, as the chosen attack's range directly dictates which movement chain (StartMovementChain()) the AI needs to perform.
+- <ins>OnEnter & Attack Selection:</ins> When the AI enters this state, it immediately calls SelectNewAttackAbility(). This is a crucial initial step, as the chosen attack's range directly dictates which movement chain (StartMovementChain()) the AI needs to perform.
 ```c++
 void UMovementState::OnEnter_Implementation()
 {
@@ -712,7 +712,7 @@ void UMovementState::OnEnter_Implementation()
 }
 ```
 
-- Transition Logic: The TryEnterToAttackState() function is the heart of this state. It checks if the AI is in range of its selected attack. If the condition is met, it immediately stops all movement abilities and requests to exit the Movement State and enter the Attack State, ensuring a seamless transition.
+- <ins>Transition Logic:</ins> The TryEnterToAttackState() function is the heart of this state. It checks if the AI is in range of its selected attack. If the condition is met, it immediately stops all movement abilities and requests to exit the Movement State and enter the Attack State, ensuring a seamless transition.
 ```c++
 void UMovementState::OnTick_Implementation(float DeltaTime)
 {
@@ -733,7 +733,7 @@ void UMovementState::TryEnterToAttackState()
 #### **1.2.3 Attack State** 
 The UAttackStateBase is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute a pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion, ensuring a fluid and responsive combat experience.
 
-- OnEnter & Attack Execution: Upon entering the AttackState, the AI first calls StopMovementAbilities() to halt any ongoing movement. It then immediately calls SelectAndMakeAttack(), which attempts to activate the corresponding ability from the Gameplay Ability System (GAS).
+- <ins>OnEnter & Attack Execution:</ins> Upon entering the AttackState, the AI first calls StopMovementAbilities() to halt any ongoing movement. It then immediately calls SelectAndMakeAttack(), which attempts to activate the corresponding ability from the Gameplay Ability System (GAS).
 ```c++
 void UAttackStateBase::OnEnter_Implementation()
 {
@@ -743,9 +743,9 @@ void UAttackStateBase::OnEnter_Implementation()
 }
 ```
 
-- Event-Driven Exit: The state does not rely on a continuous tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
+- <ins>Event-Driven Exit:</ins> The state does not rely on a continuous tick to determine when to exit. Instead, it subscribes to the OnGameplayAbilityEndedWithDataBP delegate. Once the attack ability has completed its execution (e.g., the attack animation finishes), this delegate fires, triggering the ExitRequest and allowing the AI to transition to its next state.
 
-- Dynamic Binding: The MakeAttack() function is a key part of the process. It first attempts to activate the ability and, if successful, dynamically binds a callback to the ability's OnGameplayAbilityEndedWithDataBP delegate. This ensures the OnAttackAbilityEnded() function is called at the precise moment the attack concludes.
+- <ins>Dynamic Binding:</ins> The MakeAttack() function is a key part of the process. It first attempts to activate the ability and, if successful, dynamically binds a callback to the ability's OnGameplayAbilityEndedWithDataBP delegate. This ensures the OnAttackAbilityEnded() function is called at the precise moment the attack concludes.
 ```c++
 void UAttackStateBase::MakeAttack()
 {
@@ -768,7 +768,7 @@ void UAttackStateBase::OnAttackAbilityEnded(const FAbilityEndedDataBP& DodgeAbil
 }
 ```
 
-- Cleanup on Exit: The OnExit() function is crucial for preventing memory leaks and unwanted behavior. It checks if the OnAttackAbilityEnded delegate is still bound and, if so, unbinds it. It also clears the LastUsedAttack reference. This robust cleanup ensures the state is ready for its next use.
+- <ins>Cleanup on Exit:</ins> The OnExit() function is crucial for preventing memory leaks and unwanted behavior. It checks if the OnAttackAbilityEnded delegate is still bound and, if so, unbinds it. It also clears the LastUsedAttack reference. This robust cleanup ensures the state is ready for its next use.
 ```c++
 void UAttackStateBase::OnExit_Implementation()
 {
@@ -788,7 +788,7 @@ void UAttackStateBase::OnExit_Implementation()
 #### **1.2.4 InComingAttack State** 
 The UInComingAttackState is the AI's reactive, defensive state. It's triggered by the Intend Handler when the AI detects a significant incoming attack and must make a split-second decision on how to react.
 
-- Decision and Action: The core of this state is the SelectAndMakeInComingAttackReaction() function, which delegates the decision-making to the Behavior Decision Component. Based on the highest-scoring defensive reaction (e.g., parry, take damage), it then calls the appropriate function to execute that action.
+- <ins>Decision and Action:</ins> The core of this state is the SelectAndMakeInComingAttackReaction() function, which delegates the decision-making to the Behavior Decision Component. Based on the highest-scoring defensive reaction (e.g., parry, take damage), it then calls the appropriate function to execute that action.
 ```c++
 void UInComingAttackState::OnEnter_Implementation()
 {
@@ -820,9 +820,9 @@ bool UInComingAttackState::SelectAndMakeInComingAttackReaction()
 }
 ```
 
-- Delegates for Event Handling: The state uses delegates extensively to manage its flow. For a Take Damage reaction, it binds to the OnDamageDealt delegate to trigger the AI's own damage-receiving ability. For a Parry reaction, it listens for the OnGameplayAbilityEndedWithDataBP delegate of the parry ability to know when it's safe to exit the state.
+- <ins>Delegates for Event Handling:</ins> The state uses delegates extensively to manage its flow. For a Take Damage reaction, it binds to the OnDamageDealt delegate to trigger the AI's own damage-receiving ability. For a Parry reaction, it listens for the OnGameplayAbilityEndedWithDataBP delegate of the parry ability to know when it's safe to exit the state.
 
-- Execution and Transition: The MakeParryAbility() and MakeTakeDamage() functions are responsible for activating the relevant Gameplay Abilities. Once the defensive ability is complete or the damage is processed, the state calls ExitRequest, allowing the AI to seamlessly transition back to its primary combat loop.
+- <ins>Execution and Transition:</ins> The MakeParryAbility() and MakeTakeDamage() functions are responsible for activating the relevant Gameplay Abilities. Once the defensive ability is complete or the damage is processed, the state calls ExitRequest, allowing the AI to seamlessly transition back to its primary combat loop.
 ```c++
 void UInComingAttackState::OnTakeDamageAbilityEnded(const FAbilityEndedDataBP& DodgeAbilityEndedData)
 {
@@ -830,7 +830,7 @@ void UInComingAttackState::OnTakeDamageAbilityEnded(const FAbilityEndedDataBP& D
 }
 ```
 
-- Robust Cleanup: The OnExit() function is critical for maintaining a clean and bug-free system. It unbinds all delegates that were used during the state's execution, preventing unintended behavior or memory leaks. This includes delegates from the DamageSubsystem and any activated abilities, ensuring the state is fully reset and ready for its next use.
+- <ins>Robust Cleanup:</ins> The OnExit() function is critical for maintaining a clean and bug-free system. It unbinds all delegates that were used during the state's execution, preventing unintended behavior or memory leaks. This includes delegates from the DamageSubsystem and any activated abilities, ensuring the state is fully reset and ready for its next use.
 ```c++
 void UInComingAttackState::OnExit_Implementation()
 {
@@ -863,7 +863,7 @@ The Intend Handler achieves this by subscribing to various delegates and events,
 
 Key Functions:
 
-- Target Detection: Scans the environment for valid targets and alerts the State Manager when a new one is found.
+- <ins>Target Detection:</ins> Scans the environment for valid targets and alerts the State Manager when a new one is found.
 
 ```c++
 void UAC_IntendHandlerBase::OnTargetDetected(AActor* DetectedTarget)
@@ -871,9 +871,9 @@ void UAC_IntendHandlerBase::OnTargetDetected(AActor* DetectedTarget)
 	OwnerStateManager->OnTargetDetected();
 }
 ```
-- Event-Driven State Changes: The Intend Handler is the primary trigger for reactive state transitions. It registers delegates for critical events:
+- <ins>Event-Driven State Changes:</ins> The Intend Handler is the primary trigger for reactive state transitions. It registers delegates for critical events:
 
-- Vulnerable State: When the enemy's Vulnerable tag is added (e.g., after a parry or stagger), the OnVulnerableTagAdded delegate fires, immediately pushing the AI into a Vulnerable state.
+- <ins>Vulnerable State:</ins> When the enemy's Vulnerable tag is added (e.g., after a parry or stagger), the OnVulnerableTagAdded delegate fires, immediately pushing the AI into a Vulnerable state.
 
 ```c++
 void UAC_IntendHandlerBase::OnVulnerableTagAdded(const UAbilitySystemComponent* AbilitySystemComponent, const FGameplayTag& Tag)
@@ -882,13 +882,13 @@ void UAC_IntendHandlerBase::OnVulnerableTagAdded(const UAbilitySystemComponent* 
 }
 ```
 
-- Incoming Attack & Reaction Logic: This system is the AI's proactive defensive layer, managing how the AI responds to detected incoming attacks from the player. It is a critical example of the tight integration between the Intend Handler, Behavior Decision, and State Manager components.
+-<ins> Incoming Attack & Reaction Logic:</ins> This system is the AI's proactive defensive layer, managing how the AI responds to detected incoming attacks from the player. It is a critical example of the tight integration between the Intend Handler, Behavior Decision, and State Manager components.
 
-- Detection and Analysis: When the player activates a melee attack, the OnTargetAbilityActivated function within the Intend Handler processes this event. It calculates the exact ComingAttackHitTime and combines all relevant tags into a FComingAttackPayload.
+- <ins>Detection and Analysis:</ins> When the player activates a melee attack, the OnTargetAbilityActivated function within the Intend Handler processes this event. It calculates the exact ComingAttackHitTime and combines all relevant tags into a FComingAttackPayload.
 
-- Decision-Making: The Intend Handler sends this payload to the Behavior Decision Component, which uses its GetBestComingAttackReaction service to determine the highest-scoring defensive reaction (e.g., parry, take damage, etc.).
+- <ins>Decision-Making:</ins> The Intend Handler sends this payload to the Behavior Decision Component, which uses its GetBestComingAttackReaction service to determine the highest-scoring defensive reaction (e.g., parry, take damage, etc.).
 
-- Execution with Precision: The SendEventToDefense function takes over to execute the chosen reaction. If the optimal reaction requires a specific timing (e.g., parrying a few frames before the hit), it uses a timer to delay the reaction, ensuring the AI performs the action at the precise moment for maximum effectiveness.
+- <ins>Execution with Precision:</ins> The SendEventToDefense function takes over to execute the chosen reaction. If the optimal reaction requires a specific timing (e.g., parrying a few frames before the hit), it uses a timer to delay the reaction, ensuring the AI performs the action at the precise moment for maximum effectiveness.
 
 ```c++
 void UAC_IntendHandlerBase::SendEventToDefense(FComingAttackPayload EventPayload)
@@ -944,15 +944,15 @@ The UBehaviorDecisionServiceBase class is the foundation for the AI's tactical d
 
 The class utilizes an FBehaviorServiceInitParams struct to initialize itself. This struct provides all the necessary references (like the Enemy, EnemyController, and Hero) upon creation, ensuring that each service has access to the data it needs without having to manually find it.
 
-- Core Functionality: The base class provides common helper functions that all decision-making services might need. A key example is ApplyDirectionPoliciesToMovementAbility(), which determines the AI's movement direction based on pre-defined policies, such as moving away from the player's last direction or a random direction. This approach ensures that the logic for common tasks is centralized and reusable, preventing code duplication.
+- <ins>Core Functionality:</ins> The base class provides common helper functions that all decision-making services might need. A key example is ApplyDirectionPoliciesToMovementAbility(), which determines the AI's movement direction based on pre-defined policies, such as moving away from the player's last direction or a random direction. This approach ensures that the logic for common tasks is centralized and reusable, preventing code duplication.
 
-- Service-Oriented Architecture: This base class is a critical part of the system's service-oriented design. By inheriting from UBehaviorDecisionServiceBase, new decision-making services can be easily added to the AI. Each new service can implement its own specific logic while still benefiting from the shared initialization and helper functions provided by the base class. This modularity makes the system highly scalable and easy to maintain.
+- <ins>Service-Oriented Architecture:</ins> This base class is a critical part of the system's service-oriented design. By inheriting from UBehaviorDecisionServiceBase, new decision-making services can be easily added to the AI. Each new service can implement its own specific logic while still benefiting from the shared initialization and helper functions provided by the base class. This modularity makes the system highly scalable and easy to maintain.
 
 #### **2.2.2 Get Best Movement** 
 
 The UBDS_GetBestMovementChain is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the Behavior Decision component, evaluating various movement "chains" based on a dynamic scoring system to select the most advantageous one for the current combat situation.
 
-- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential movement chain. The chain with the highest final score is chosen. The score is calculated by combining multiple factors, each handled by its own dedicated function:
+- <ins>Dynamic Scoring & Decision Logic:</ins> This service works by assigning a score to each potential movement chain. The chain with the highest final score is chosen. The score is calculated by combining multiple factors, each handled by its own dedicated function:
 ```c++
 UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf<UGAS_GameplayAbilityBase> SelectedAbilityClass)
 {
@@ -1011,7 +1011,7 @@ UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf
 }
 ```
 
-- Distance Scoring: CalculateMovementChainScoreBasedOnTargetDistance() evaluates how a movement chain's distance to the target affects its score. For instance, a movement chain designed for close-quarters combat might get a negative score if the enemy is far from the player, discouraging its selection. This is often handled by a curve asset, allowing for fine-grained control over the scoring.
+- <ins>Distance Scoring:</ins> CalculateMovementChainScoreBasedOnTargetDistance() evaluates how a movement chain's distance to the target affects its score. For instance, a movement chain designed for close-quarters combat might get a negative score if the enemy is far from the player, discouraging its selection. This is often handled by a curve asset, allowing for fine-grained control over the scoring.
 ```c++
 float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnTargetDistance(UMovementChainAsset* MovementChainAsset)
 {
@@ -1043,9 +1043,9 @@ float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnTargetDistanc
 }
 ```
 
-- Target Movement Scoring: CalculateMovementChainScoreBasedOnTargetMovement() adjusts the score based on whether the target (the player) is currently moving or standing still. This allows the AI to choose different movement patterns in response to a mobile or stationary player, making its behavior feel more intelligent and adaptive.
+- <ins>Target Movement Scoring:</ins> CalculateMovementChainScoreBasedOnTargetMovement() adjusts the score based on whether the target (the player) is currently moving or standing still. This allows the AI to choose different movement patterns in response to a mobile or stationary player, making its behavior feel more intelligent and adaptive.
 
-- Behavior State Modifiers: CalculateMovementChainScoreBasedOnBehaviorState() incorporates the AI's current BehaviorState (e.g., Aggressive, Defensive) into the score. This allows you to create different sets of movement chains that are preferred for specific tactical situations.
+- <ins>Behavior State Modifiers:</ins> CalculateMovementChainScoreBasedOnBehaviorState() incorporates the AI's current BehaviorState (e.g., Aggressive, Defensive) into the score. This allows you to create different sets of movement chains that are preferred for specific tactical situations.
 ```c++
 float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnBehaviorState(UMovementChainAsset* MovementChainAsset)
 {
@@ -1065,7 +1065,7 @@ float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnBehaviorState
 }
 ```
 
-- Direction Policies: The ApplyDirectionPoliciesToSelectedMovementChain() function is the final step. It takes the chosen movement chain and applies a specific direction policy to each of its movement abilities. For example, a policy might dictate that the AI should always dash away from the player's last direction, making the AI's movements more unpredictable and effective.
+- <ins>Direction Policies:</ins> The ApplyDirectionPoliciesToSelectedMovementChain() function is the final step. It takes the chosen movement chain and applies a specific direction policy to each of its movement abilities. For example, a policy might dictate that the AI should always dash away from the player's last direction, making the AI's movements more unpredictable and effective.
 ```c++
 bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UMovementChainAsset* SelectedMovementChainAsset)
 {
@@ -1108,7 +1108,7 @@ bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UM
 
 The UBDS_GetBestAttack is a specialized service designed to select the most optimal offensive ability for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
 
-- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential attack. The attack with the highest final score is chosen.
+- <ins>Dynamic Scoring & Decision Logic:</ins> This service works by assigning a score to each potential attack. The attack with the highest final score is chosen.
 ```c++
 FAttackData UBDS_GetBestAttack::GetBestAttack()
 {
