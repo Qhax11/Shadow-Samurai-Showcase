@@ -682,20 +682,20 @@ public:
 };
 ```
 
-The core API for interaction and management is defined by a set of `Key Virtual Functions` that map directly to the AI's execution cycle:
+The core API for interaction and management is defined by a set of `Key Virtual Functions` that align with the AI's execution cycle: 
 
 - <ins>OnEnter():</ins> Executed immediately when the AI transitions into this state. This is the activation point where crucial initialization logic is handled, such as binding delegates or halting prior movement.
 
 - <ins>OnTick(float DeltaTime):</ins> This function serves as the State's primary update loop, called every frame while the AI is in this state. It is utilized for continuous checks and updates, primarily monitoring distance, time-sensitive events, or evaluating exit conditions.
 
-- <ins>OnExit():</ins> Called just before the AI leaves the state. This function is solely responsible for the essential cleanup logic, ensuring that anything initiated in `OnEnter()` or during execution (like unbinding delegates or resetting temporary variables) is safely terminated.
+- <ins>OnExit():</ins> Called just before the AI leaves the state, this function is solely responsible for essential cleanup logic, ensuring that anything initiated in `OnEnter()` or during execution is safely terminated, like unbinding delegates or resetting temporary variables.
 
 - <ins>EnterCondition() and ExitCondition():</ins> These virtual functions provide an additional, powerful layer of `self-governance`. They allow the state itself to dynamically check if the tactical conditions are currently right for it to be safely entered or exited, providing a crucial safety net for complex state transitions.
 
 In essence, UStateBase is the contract for behavior, defining the rigorous API that the StateManager uses to interact with and manage all the different behavioral implementations.
 
 #### **1.2.2 Movement State** 
-The `UMovementState` is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement, ensuring it gets into the optimal position to execute a pre-selected attack. It is highly reactive and continuously evaluates the tactical situation to find the most suitable movement chain.
+The `UMovementState` is one of the most dynamic states within the AI system. Its primary purpose is to manage the AI's movement, ensuring it gets into the `optimal position to execute a pre-selected attack`. It is highly reactive and continuously evaluates the tactical situation to find the most suitable movement chain.
 
 - <ins>OnEnter & Attack Selection:</ins> When the AI enters this state, it immediately calls `SelectNewAttackAbility()`. This is a crucial initial step, as the chosen attack's range directly dictates which movement chain `StartMovementChain()` the AI needs to perform.
 ```c++
@@ -710,6 +710,19 @@ void UMovementState::OnEnter_Implementation()
 	}
 	SelectedAttackCDO = SelectedAttack.AbilityClass->GetDefaultObject<UGAS_GameplayAbilityBase>();
 	StartMovementChain(SelectedAttack.AbilityClass);
+}
+```
+
+- The `StartMovementChain()` function is responsible for initiating the movement sequence and dynamically `binding a completion callback`. It calls the Movement Manager to start the chain and then binds `OnMovementChainEnded` to the manager's delegate. This dynamic binding ensures the `UMovementState` is notified the moment the AI reaches its target or the movement fails.
+```c++
+void UMovementState::StartMovementChain(TSubclassOf<class UGAS_GameplayAbilityBase> SelectedAttackAbilityClass)
+{
+	MovementManagerComponent->StartMovementChain(SelectedAttackAbilityClass);
+
+	if (!MovementManagerComponent->OnMovementChainEnded.IsAlreadyBound(this, &UMovementState::OnMovementChainEnded)) 
+	{
+		MovementManagerComponent->OnMovementChainEnded.AddDynamic(this, &UMovementState::OnMovementChainEnded);
+	}
 }
 ```
 
