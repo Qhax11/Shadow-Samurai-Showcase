@@ -745,9 +745,9 @@ void UMovementState::TryEnterToAttackState()
 ```
 
 #### **1.2.3 Attack State** 
-The `UAttackStateBase` is where the AI's offensive actions are managed. Once the AI has successfully positioned itself within a suitable range, this state takes over to execute a pre-selected attack ability. This state also handles the entire lifecycle of the attack, from activation to completion, ensuring a fluid and responsive combat experience.
+The `UAttackStateBase` manages the AI's offensive operations. Once the AI has successfully positioned itself within a suitable range (transitioning from the Movement State), this state takes over to execute a `pre-selected attack ability`. This state meticulously handles the entire lifecycle of the attack, from activation and execution to completion and cleanup, ensuring a fluid and responsive combat experience.
 
-- <ins>OnEnter & Attack Execution:</ins> Upon entering the `AttackState`, the AI first calls `StopMovementAbilities()` to halt any ongoing movement. It then immediately calls `SelectAndMakeAttack()`, which attempts to activate the corresponding ability from the `Gameplay Ability System (GAS)`.
+- <ins>OnEnter:</ins> Upon entering the `AttackState`, the AI first calls `StopMovementAbilities()` to halt any ongoing movement. It then immediately calls `SelectAndMakeAttack()`, which attempts to activate the corresponding ability from the `Gameplay Ability System (GAS)`.
 ```c++
 void UAttackStateBase::OnEnter_Implementation()
 {
@@ -757,7 +757,7 @@ void UAttackStateBase::OnEnter_Implementation()
 }
 ```
 
-- <ins>Dynamic Binding:</ins> The `MakeAttack()` function is a key part of the process. It first attempts to activate the ability and, if successful, dynamically `binds a callback` to the ability's `OnGameplayAbilityEndedWithDataBP` delegate. This ensures the `OnAttackAbilityEnded()` function is called at the precise moment the attack concludes.
+- <ins>Attack Execution and Dynamic Binding:</ins> The `MakeAttack()` function is central to the state's lifecycle management and `execution`. It first calls `TryActivateAbilityByClassAndReturnInstance` to `initiate the ability`. If the activation is successful, the state establishes a `dynamic binding` by adding the `OnAttackAbilityEnded()` callback to the activated ability's `OnGameplayAbilityEndedWithDataBP` delegate. This ensures the `AttackState` is notified and can proceed with its exit logic the precise moment the ability concludes.
 ```c++
 void UAttackStateBase::MakeAttack()
 {
@@ -773,14 +773,15 @@ void UAttackStateBase::MakeAttack()
 		LastUsedAttack = ActivatedAbility;
 	}
 }
-
+```
+```c++
 void UAttackStateBase::OnAttackAbilityEnded(const FAbilityEndedDataBP& DodgeAbilityEndedData)
 {
 	ExitRequest("OnAttackAbilityEnded");
 }
 ```
 
-- <ins>Cleanup on Exit:</ins> The `OnExit()` function is crucial for preventing memory leaks and unwanted behavior. It checks if the `OnGameplayAbilityEndedWithDataBP` delegate is still bound and, if so, unbinds it. It also clears the `LastUsedAttack` reference. This robust cleanup ensures the state is ready for its next use.
+- <ins>Cleanup on Exit:</ins> The `OnExit()` function is crucial for preventing `memory leaks` and ensuring component `integrity`. It checks the `LastUsedAttack` reference and confirms whether the `OnGameplayAbilityEndedWithDataBP` delegate is still dynamically bound. If it is, the delegate is `explicitly removed` using `RemoveDynamic()`. Finally, it clears the `LastUsedAttack` reference, ensuring the state is `fully reset` and ready for its next use without leaving `dangling pointers` or active bindings.
 ```c++
 void UAttackStateBase::OnExit_Implementation()
 {
@@ -798,9 +799,9 @@ void UAttackStateBase::OnExit_Implementation()
 ```
 
 #### **1.2.4 InComingAttack State** 
-The `UInComingAttackState` is the AI's reactive, defensive state. It's triggered by the `Intend Handler` when the AI detects a significant incoming attack and must make a split-second decision on how to react.
+The `UInComingAttackState` is the AI's `reactive, defensive state`. It's triggered by the `Intend Handler` when the AI detects a significant incoming attack and must make a split-second decision on how to react.
 
-- <ins>Decision and Action:</ins> The core of this state is the `SelectAndMakeInComingAttackReaction()` function, which delegates the decision-making to the `Behavior Decision Component`. Based on the highest-scoring defensive reaction (e.g., parry, take damage), it then calls the appropriate function to execute that action.
+- <ins>OnEnter: Decision and Action Delegation:</ins> The state begins by calling `SelectAndMakeInComingAttackReaction()` immediately upon entry. This function delegates the core decision-making to the `Behavior Decision Component`. Based on the highest-scoring defensive reaction (e.g., parry, take damage), it then directs the flow to the appropriate execution function (`MakeTakeDamage` or `MakeParryAbility`).
 ```c++
 void UInComingAttackState::OnEnter_Implementation()
 {
@@ -841,8 +842,22 @@ void UInComingAttackState::OnTakeDamageAbilityEnded(const FAbilityEndedDataBP& D
 	ExitRequest("OnTakeDamageAbilityEnded");
 }
 ```
+```c++
+void UInComingAttackState::OnParryAbilityEnded(const FAbilityEndedDataBP& DodgeAbilityEndedData)
+{
+	if (EnemyASC->HasMatchingGameplayTag(GAS_Tags::TAG_Gameplay_State_InCombat_ParryKnockback))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("State Manager: OnParryAbilityEnded with knocback, now we listen knocback removed for exit"));
+		EnemyTagDelegatesComp->RegisterDelegateForTag(GAS_Tags::TAG_Gameplay_State_InCombat_ParryKnockback, EListenMode::OnRemoved).BindDynamic(this, &UInComingAttackState::OnParryKnocbackTagRemoved);
+	}
+	else
+	{
+		ExitRequest("Parry Ability Ended without knocback.");
+	}
+}
+```
 
-- <ins>Robust Cleanup:</ins> The `OnExit()` function is critical for maintaining a clean and bug-free system. It unbinds all delegates that were used during the state's execution, preventing unintended behavior or memory leaks. This includes delegates from the `DamageSubsystem` and any activated abilities, ensuring the state is fully reset and ready for its next use.
+- <ins>Robust Cleanup:</ins> The `OnExit()` function is critical for maintaining system `stability` and preventing the memory issues associated with dynamic binding. It performs explicit cleanup by checking all potential `active bindings` to the `Gameplay Ability System (GAS)` delegates `(OnGameplayAbilityEndedWithDataBP)` and immediately unbinding them using `RemoveDynamic()`. This robust process ensures the state is fully reset and ready for its next use `without leaving dangling delegates or active references` that could lead to unintended behavior or crashes.
 ```c++
 void UInComingAttackState::OnExit_Implementation()
 {
