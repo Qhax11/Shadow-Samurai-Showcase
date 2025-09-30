@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
                - [Get Best Attack Base](#223-Get-Best-Attack)
                - [Get Best IncomingAttack Reaction](#224-Get-Best-IncomingAttack-Reaction)
      - [The Execution Layer](#3-The-Execution-Layer)
-          - [Movement System](#31-Get-Best-IncomingAttack-Reaction)
+          - [Movement System](#31-Movement-System)
           - [Movement Abilities](#32-Movement-Abilities)
                - [Chase Target](#321-Chase-Target)
                - [Strafing](#322-Strafing)
