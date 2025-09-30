@@ -884,7 +884,7 @@ void UInComingAttackState::OnExit_Implementation()
 ```
 
 ### **1.3 Intend Handler** 
-The `UAC_IntendHandlerBase` component serves as the AI's `perceptual layer`, acting as a crucial bridge between environmental stimuli and the AI's core decision-making process. Its primary purpose is to identify critical moments such as target detection, vulnerability, or incoming attacks—and to notify the [State Manager](#11-State-Manager) to initiate a new behavioral sequence.
+The `UAC_IntendHandlerBase` component serves as the AI's `perceptual layer`, acting as a crucial bridge between environmental stimuli and the AI's core decision making process. Its primary purpose is to identify critical moments such as target detection, vulnerability, or incoming attacks and to notify the [State Manager](#11-State-Manager) to initiate a new behavioral sequence.
 
 The Intend Handler achieves this by subscribing to various delegates and events, rather than constantly polling for changes. This `event-driven approach` ensures the system is `highly performant and instantly responsive` to dynamic combat situations.
 
@@ -910,7 +910,7 @@ Proactive Defense: Incoming Attack Reaction Logic
 
 This system serves as the AI's proactive defensive layer, managing precise reactions to detected attacks. It is a critical example of the tight integration between the `Intend Handler`, `Behavior Decision Component`, and `State Manager`. The entire flow ensures that when the AI detects an incoming attack, it calculates the optimal defensive reaction and executes it with frame precision.
 
-- <ins>Detection and Payload Creation:</ins> When the player initiates a melee attack, the `OnTargetAbilityActivated` function processes the event. This function's responsibility is to gather all necessary attack data—including static and dynamic `Gameplay Tags` and the crucial ComingAttackHitTime—and package them into a structured `FComingAttackPayload`. This payload contains all the intelligence required for the AI to make a defensive choice.
+- <ins>Detection and Payload Creation:</ins> When the player initiates a melee attack, the `OnTargetAbilityActivated` function processes the event. This function's responsibility is to gather all necessary attack data including static and dynamic `Gameplay Tags` and the crucial ComingAttackHitTime and package them into a structured `FComingAttackPayload`. This payload contains all the intelligence required for the AI to make a defensive choice.
 ```c++
 void UAC_IntendHandlerBase::OnTargetAbilityActivated(UGameplayAbility* Ability)
 {
