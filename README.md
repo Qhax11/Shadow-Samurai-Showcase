@@ -1125,6 +1125,7 @@ The class utilizes an `FBehaviorServiceInitParams` struct to initialize itself. 
 The `UBDS_GetBestMovementChain` is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the `Behavior Decision` component, evaluating various movement "chains" based on a `dynamic scoring system` to select the most advantageous one for the current combat situation, specifically after an attack ability has been selected.
 
 Data-Driven Design: Movement Chain Assets
+
 The entire movement decision process is driven by three key Data Assets 
 
 - <ins>UMovementChainAsset:</ins> Defines a `single, specific sequence of movement abilities` (the "chain"). Contains all scoring modifiers and constraints (Min Range, Score Bias, etc.) needed by the service to evaluate its utility.
@@ -1227,8 +1228,6 @@ UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf
 
         float TotalScore = MovementChainAsset->ScoreBias + DistanceScore + TargetMovementScore + BehaviorStateScore;
 
-        UE_LOG(LogTemp, Log, TEXT("[AI] MovementChain %s → Score: %.2f"), *MovementChainAsset->MovementChainName.ToString(), TotalScore);
-
         if (TotalScore > BestScore)
         {
             BestScore = TotalScore;
@@ -1239,14 +1238,6 @@ UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf
     }
 
     ApplyDirectionPoliciesToSelectedMovementChain(BestMovementChainDataAsset);
-    /*
-    if (GEngine && EnableSelectedDebug)
-    {
-        GEngine->AddOnScreenDebugMessage(10, 3.5f, FColor::Cyan,
-            FString::Printf(TEXT(">> Selected MovementChain: %s | DistanceScore: %.1f | TargetMovementScore: %.1f "),
-                *BestMovementChainDataAsset->MovementChainName.ToString(), BestMovementChainDistanceScore, BestMovementChainTargetMovementScore));
-    }
-    */
     return BestMovementChainDataAsset;
 }
 ```
