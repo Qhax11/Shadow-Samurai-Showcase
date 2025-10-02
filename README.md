@@ -984,22 +984,142 @@ void UAC_IntendHandlerBase::TriggerIncomingAttackReaction(UBDS_ComingAttackReact
 ```
 
 ## **2. The Behavior Decision and Scoring** 
-The transition from the `Control Flow (I)` to this `Behavior Decision (II)` marks the point where the AI moves from knowing what state it is in to `deciding what tactical action to take next`. This mechanism is the source of the AI's "intelligence," ensuring that every action is context-aware and purposeful, rather than simply randomized.
+The shift from the `Control Flow (I)` (which determines which high-level state the AI is currently in) to this `Behavior Decision (II)` section is the transition to tactical execution. Here, the AI answers the question: `"Given my current state and combat context, what specific, optimal action should I take right now?"`
+
+This system is built around the central UAC_BehaviorDecision component, which acts as an `orchestrator and data provider`. Its primary role is not to invent actions, but to manage and query a set of specialized Behavior `Decision Services (BDS)`. These services contain the true "intelligence," using a dynamic `scoring system` to weigh every available action be it an `Attack`, a `Movement Chain`, or a `Defensive Reaction` and determine the single best course of action data to provide back to the Control Flow.
 
 ### **2.1 Behavior Decision** 
-The `UAC_BehaviorDecision` component is the AI's tactical layer, responsible for choosing the next action (attack, movement, or a combination of both) based on a dynamic scoring system. It operates within the `Combat state`, as triggered by the `StateManager`. This design ensures that the AI's actions are `context-aware and purposeful`.
+The `UAC_BehaviorDecision` component is the AI's `tactical action layer`, specifically responsible for selecting the optimal action data based on dynamic scoring. This component acts as the `data source` for the AI's overall control logic, providing the necessary tactical actions and data required by the main AI system to proceed with execution, regardless of the current high-level state.
+
+- <ins>Service Initialization:</ins> The core orchestration happens in `InitalizeServiceses()`. This function dynamically creates and initializes the three main decision-making services, injecting all the required context data `(Owner, Target, ASC, Behavior State, and relevant Data Assets)` via the `FBehaviorServiceInitParams` structure.
+```c++
+void UAC_BehaviorDecision::InitalizeServiceses()
+{
+    for (UBDS_ComingAttackReactionBase* ReactionInstance : ComingAttackReactionAsset->ComingAttackReactions)
+    {
+        if (ReactionInstance) 
+        {
+            FBehaviorServiceInitParams ComingAttackReactionServiceInitData = FBehaviorServiceInitParams(
+                ComingAttackReactionAsset, OwnerEnemyBase, OwnerController, OwnerEnemyASC, HeroBase, HeroMovementListenerComp, BehaviorState);
+            ReactionInstance->Initialize(ComingAttackReactionServiceInitData);
+        }
+    }
+
+    GetBestAttackService = NewObject<UBDS_GetBestAttack>(GetOwner());
+    FBehaviorServiceInitParams GetBestAttackServiceInitData = FBehaviorServiceInitParams
+    (AttackAbilityAsset, OwnerEnemyBase, OwnerController, OwnerEnemyASC, HeroBase, HeroMovementListenerComp, BehaviorState);
+    GetBestAttackService->Initialize(GetBestAttackServiceInitData);
+
+    GetBestMovementChainService = NewObject<UBDS_GetBestMovementChain>(GetOwner());
+    FBehaviorServiceInitParams GetBestMovementChainServiceInitData = FBehaviorServiceInitParams(
+        AttackAbilityMovementChainMapAsset, OwnerEnemyBase, OwnerController, OwnerEnemyASC, HeroBase, HeroMovementListenerComp, BehaviorState);
+    GetBestMovementChainService->Initialize(GetBestMovementChainServiceInitData);
+}
+```
+
+Behavior Service APIs:
+The `UAC_BehaviorDecision` exposes the following three public, Blueprint-callable API functions. These functions serve as the bridge, delegating the complex scoring logic entirely to the managed services and simply returning the optimal data structure.
+
+- <ins>Attack Selection:</ins> The `GetBestAttack()` function calls the dedicated attack service `(UBDS_GetBestAttack)` to execute the scoring logic across all available attacks and returns the most suitable attack ability data `(FAttackData)`.
+```c++
+FAttackData UAC_BehaviorDecision::GetBestAttack()
+{
+    if (!GetBestAttackService) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GetBestAttackService is null in: %s"), *GetName());
+        return FAttackData();
+    }
+
+    FAttackData BestAttack = GetBestAttackService->GetBestAttack();
+    LastSelectedAttackAbilityData = BestAttack;
+    return BestAttack;
+}
+```
+
+- <ins>Movement Chain Selection:</ins> The `GetBestMovementChain()` function takes the selected attack ability as input and finds the corresponding, most effective movement chain (e.g., Dash in, Retreat, Strafe) that places the AI in the optimal position for execution.
+```c++
+TArray<FMovementAbilityData> UAC_BehaviorDecision::GetBestMovementChain(TSubclassOf<UGAS_GameplayAbilityBase> SelectedAbilityClass)
+{
+    if (!GetBestMovementChainService)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GetBestMovementChainService is null in: %s"), *GetName());
+        return TArray<FMovementAbilityData>();
+    }
+
+    UMovementChainAsset* BestMovementChainDataAsset = nullptr;
+
+    if (IsValid(GetBestMovementChainService)) 
+    {
+        BestMovementChainDataAsset = GetBestMovementChainService->GetBestMovementChain(SelectedAbilityClass);
+    }
+
+    if (!BestMovementChainDataAsset) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("BestMovementChainDataAsset is null in: %s"), *GetName());
+        return TArray<FMovementAbilityData>();
+    }
+
+    return BestMovementChainDataAsset->MovementChain;
+}
+```
+
+- <ins>Incoming Attack Reaction:</ins> The `GetBestComingAttackReaction()` function is responsible for the AI's defensive decision-making. It iterates through all registered Reaction Services, checks if they are `enabled` in the current context, calculates a `score` for each, and selects the reaction with the highest score (e.g., Parry, Dodge).
+```c++
+UBDS_ComingAttackReactionBase* UAC_BehaviorDecision::GetBestComingAttackReaction(FComingAttackPayload ComingAttackPayload)
+{
+    UBDS_ComingAttackReactionBase* BestComingAttackInstance = nullptr;
+
+    if (!IsValid(ComingAttackReactionAsset) || !ComingAttackPayload.ComingAttack)
+    {
+        return BestComingAttackInstance;
+    }
+
+    EComingAttackReaction BestReaction = EComingAttackReaction::TakeDamage;
+    float BestScore = -FLT_MAX;
+
+    for (UBDS_ComingAttackReactionBase* ReactionInstance : ComingAttackReactionAsset->ComingAttackReactions)
+    {
+        if (!ReactionInstance) 
+        {
+            UE_LOG(LogTemp, Warning, TEXT("ReactionInstance is null in: %s"), *GetName());
+            continue;
+        }
+
+        if (!ReactionInstance->IsEnable(ComingAttackPayload))
+        {
+            continue;
+        }
+
+        float ComingAttackReactionScore = ReactionInstance->CalculateComingAttackReactionScore(ComingAttackPayload);
+        UE_LOG(LogTemp, Log, TEXT("[AI] Reaction %s → Score: %.2f"), *ReactionInstance->ComingAttackReactionName.ToString(), ComingAttackReactionScore);
+
+        if (ComingAttackReactionScore > BestScore)
+        {
+            BestScore = ComingAttackReactionScore;
+            BestComingAttackInstance = ReactionInstance;
+        }
+    }
+
+    if (BestComingAttackInstance)
+    {
+        BestComingAttackInstance->InitializeAfterSelection();
+        LastSelectedComingAttackReaction = BestComingAttackInstance;
+        UE_LOG(LogTemp, Log, TEXT("[AI] SelectedReaction %s"), *BestComingAttackInstance->ComingAttackReactionName.ToString());
+    }
+
+    return BestComingAttackInstance;
+}
+```
 
 ### **2.2 Services** 
 The tactical complexity of the AI system requires a `highly modular and scalable approach` to data analysis and decision-making. This is achieved through a `Service-Oriented Architecture`, where specific, specialized services handle distinct decision types.
 
+Crucially, these Services are the core tools utilized by the `UAC_BehaviorDecision` component. They encapsulate all the complex scoring, utility calculations, and contextual data analysis, allowing the UAC_BehaviorDecision to remain a clean, centralized manager that merely queries the Services for the best possible action data.
+
 #### **2.2.1 Service Base** 
-The `UBehaviorDecisionServiceBase` class is the foundation for the AI's tactical decision-making system. It is a foundational abstract class designed to be inherited by specific services that handle different types of decisions, such as selecting an `attack` or a `movement chain`.
+The `UBehaviorDecisionServiceBase` class is the foundation for the AI's tactical decision-making system. It is a foundational abstract class designed to be inherited by specific services that handle different types of decisions, such as selecting an attack or a movement chain.
 
 The class utilizes an `FBehaviorServiceInitParams` struct to initialize itself. This struct provides all the necessary references (like the `Enemy`, `EnemyController`, and `Hero`) upon creation, ensuring that each service has access to the data it needs without having to manually find it.
-
-- <ins>Core Functionality:</ins> The base class provides common helper functions that all decision-making services might need. A key example is ApplyDirectionPoliciesToMovementAbility(), which determines the AI's movement direction based on pre-defined policies, such as moving away from the player's last direction or a random direction. This approach ensures that the logic for common tasks is centralized and reusable, preventing code duplication.
-
-- <ins>Service-Oriented Architecture:</ins> This base class is a critical part of the system's `service-oriented` design. By inheriting from `UBehaviorDecisionServiceBase`, new decision-making services can be easily added to the AI. Each new service can implement its own specific logic while still benefiting from the shared initialization and helper functions provided by the base class. This modularity makes the system highly scalable and easy to maintain.
 
 #### **2.2.2 Get Best Movement** 
 
