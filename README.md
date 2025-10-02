@@ -1,4 +1,4 @@
-# Shadow-Samurai-Showcase
+# Shadow Samurai Showcase
 
 This is a personal project built using a modified version of the [https://github.com/Qhaxi/GAS_Template-for-SinglePlayer-2D](https://github.com/Qhax11/GAS_Template-for-SinglePlayer-2D).
 Since it's still a work in progress, and not all systems are production-ready, the full source code is not shared publicly.
