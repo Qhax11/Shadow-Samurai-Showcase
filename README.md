@@ -1122,10 +1122,77 @@ The `UBehaviorDecisionServiceBase` class is the foundation for the AI's tactical
 The class utilizes an `FBehaviorServiceInitParams` struct to initialize itself. This struct provides all the necessary references (like the `Enemy`, `EnemyController`, and `Hero`) upon creation, ensuring that each service has access to the data it needs without having to manually find it.
 
 #### **2.2.2 Get Best Movement** 
+The `UBDS_GetBestMovementChain` is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the `Behavior Decision` component, evaluating various movement "chains" based on a `dynamic scoring system` to select the most advantageous one for the current combat situation, specifically after an attack ability has been selected.
 
-The `UBDS_GetBestMovementChain` is a specialized service responsible for determining the optimal movement sequence for the AI. It operates as part of the Behavior Decision component, evaluating various movement "chains" based on a dynamic scoring system to select the most advantageous one for the current combat situation.
+Data-Driven Design: Movement Chain Assets
+The entire movement decision process is driven by three key Data Assets 
 
-- <ins>Dynamic Scoring & Decision Logic:</ins> This service works by assigning a score to each potential `movement chain`. The chain with the highest final score is chosen. The score is calculated by combining multiple factors, each handled by its own dedicated function:
+- <ins>UMovementChainAsset:</ins> Defines a `single, specific sequence of movement abilities` (the "chain"). Contains all scoring modifiers and constraints (Min Range, Score Bias, etc.) needed by the service to evaluate its utility.
+```c++
+UCLASS(BlueprintType)
+class UMovementChainAsset : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Name of this movement chain. Used for debugging or referencing in logic."))
+    FName MovementChainName;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Sequence of movement abilities that make up this chain. Executed in order."))
+    TArray<FMovementAbilityData> MovementChain;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Optional score modifiers based on current behavior state (e.g., aggressive, defensive)."))
+    TMap<EBehaviorState, float> BehaviorStateModifiers;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Score curve based on distance to target. High values make this chain more likely when far/close depending on the curve."))
+    UCurveFloat* DistanceScoreCurve = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Score bonus applied if the target is currently moving."))
+    float ScoreModifierWhenTargetIsMoving = 0.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Score bonus applied if the target is not moving)."))
+    float ScoreModifierWhenTargetIsNotMoving = 0.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Minimum target distance required for this chain to be considered."))
+    float MinRange;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ToolTip = "Flat score bias added to this chain's total score. Useful to prioritize certain chains."))
+    float ScoreBias = 0.f;
+};
+```
+
+- <ins>FAttackAbilityMovementChains:</ins> Maps a single `Attack Ability Class` to an array of UMovementChainAsset instances. This defines the pool of possible movement chains for that specific attack.
+```c++
+USTRUCT(BlueprintType)
+struct FAttackAbilityMovementChains
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TSubclassOf<UGAS_GameplayAbilityBase> AttackAbilityClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<UMovementChainAsset*> MovementChainAssets;
+};
+```
+
+- <ins>UAttackAbilityMovementChainMapAsset:</ins> The primary container. Holds an array of `FAttackAbilityMovementChains` structs, allowing the AI to look up all relevant movement options for any given attack ability.
+```c++
+UCLASS(BlueprintType)
+class UAttackAbilityMovementChainMapAsset : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<FAttackAbilityMovementChains> ChainMappings;
+};
+```
+
+Dynamic Scoring & Decision Logic:
+
+- <ins>GetBestMovementChain:</ins> The `GetBestMovementChain()` function orchestrates the decision process. It first retrieves the list of valid movement chains associated with the `SelectedAbilityClass`. It then iterates through each potential chain, applies dedicated scoring functions to calculate its utility, and selects the chain with the highest total score.
 ```c++
 UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf<UGAS_GameplayAbilityBase> SelectedAbilityClass)
 {
@@ -1184,7 +1251,9 @@ UMovementChainAsset* UBDS_GetBestMovementChain::GetBestMovementChain(TSubclassOf
 }
 ```
 
-- <ins>Distance Scoring:</ins> `CalculateMovementChainScoreBasedOnTargetDistance()` evaluates how a movement chain's distance to the target affects its score. For instance, a movement chain designed for close-quarters combat might get a negative score if the enemy is far from the player, discouraging its selection. This is often handled by a curve asset, allowing for fine-grained control over the scoring.
+Scoring Components:
+
+- <ins>Distance Scoring:</ins> The `CalculateMovementChainScoreBasedOnTargetDistance()` function evaluates how a movement chain's distance to the target affects its score. The logic applies bonuses or penalties based on the target's recent movement (if the target is moving or standing still) and applies a `hard penalty` (-100.0f) if the AI is already closer than the chain's `MinRange`, effectively eliminating that chain from selection.
 ```c++
 float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnTargetDistance(UMovementChainAsset* MovementChainAsset)
 {
@@ -1218,7 +1287,7 @@ float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnTargetDistanc
 
 - <ins>Target Movement Scoring:</ins> `CalculateMovementChainScoreBasedOnTargetMovement()` adjusts the score based on whether the target (the player) is currently moving or standing still. This allows the AI to choose different movement patterns in response to a mobile or stationary player, making its behavior feel more intelligent and adaptive.
 
-- <ins>Behavior State Modifiers:</ins> `CalculateMovementChainScoreBasedOnBehaviorState()` incorporates the AI's current BehaviorState (e.g., `Aggressive`, `Defensive`) into the score. This allows you to create different sets of movement chains that are preferred for specific tactical situations.
+- <ins>Behavior State Modifiers:</ins> The `CalculateMovementChainScoreBasedOnBehaviorState()` function incorporates the AI's current `BehaviorState` (e.g., `Aggressive`, `Defensive`) into the score by referencing the `BehaviorStateModifiers` map defined in the `UMovementChainAsset`. This allows designers to prioritize certain chains based on the AI's top-level tactical role.
 ```c++
 float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnBehaviorState(UMovementChainAsset* MovementChainAsset)
 {
@@ -1238,7 +1307,9 @@ float UBDS_GetBestMovementChain::CalculateMovementChainScoreBasedOnBehaviorState
 }
 ```
 
-- <ins>Direction Policies:</ins> The `ApplyDirectionPoliciesToSelectedMovementChain()` function is the final step. It takes the chosen movement chain and applies a specific direction policy to each of its movement abilities. For example, a policy might dictate that the AI should always dash away from the player's last direction, making the AI's movements more unpredictable and effective.
+Direction Policies:
+
+- <ins>Direction Policies:</ins> The `ApplyDirectionPoliciesToSelectedMovementChain()` function is the final, critical step, where abstract policies are converted into concrete movement directions. It iterates through every movement ability in the selected chain and uses the logic inherited from the `UBehaviorDecisionServiceBase` to resolve the `DirectionPolicyTag` (e.g., `TAG_AI_Direction_Policy_Random` or `TAG_AI_Direction_Policy_PlayerLastDirection`) into a final `ResolvedDirectionTag`.
 ```c++
 bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UMovementChainAsset* SelectedMovementChainAsset)
 {
