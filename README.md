@@ -1692,7 +1692,7 @@ It clears any active MovementTimerHandle instances, guaranteeing that all time-b
 
 This meticulous cleanup ensures that the `UGA_EnemyMovementBase` is a reliable, atomic unit of action, ready to be instantiated and reused for any movement chain.
 
-#### **3.2.2 Chase Target** 
+#### **3.2.1 Chase Target** 
 The `UGA_EnemyChaseTarget` ability is the concrete implementation of the base movement system focused on immediate and persistent target acquisition. Its primary function is to direct the AI to its designated target actor (typically the player) and maintain pursuit for a tactically defined duration.
 
 - Execution and Duration Control
@@ -1708,7 +1708,7 @@ If the EventMagnitude is greater than zero, the ability sets a timer that execut
 
 This time-based self-termination mechanism ensures that the Chase Target ability remains a highly modular and predictable component, allowing designers to precisely control the duration of pursuit within any complex movement sequence.
 
-#### **3.2.3 Strafing** 
+#### **3.2.2 Strafing** 
 
 3.2.2 Strafing Base
 The UGA_EnemyStrafingBase is a highly specialized movement ability that demonstrates the system's deep integration with environmental awareness and the Environmental Query System (EQS). Unlike simple pursuit, this ability's purpose is tactical repositioning and evasion, requiring the AI to find the optimal lateral position relative to the target.
