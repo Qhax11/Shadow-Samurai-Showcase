@@ -56,43 +56,67 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
 ## Gameplay Systems
 
 ### **1. Target Lock System**
-Locking onto enemies and switching targets dynamically during combat. Includes target highlighting, camera adjustments, and orientation logic.
+The Target Lock System is a modular component responsible for managing dynamic combat focus, target switching, and the continuous orientation of both the camera and the player character. The system is built on the Gameplay Ability System (GAS), utilizing Gameplay Tags for state management and Enhanced Input for control.
 
-This system allows the player to lock onto enemies, rotate the camera and character toward the current target, and dynamically switch targets using horizontal mouse movement. The system is fully modular and built on top of GAS and input actions.
+- <ins>State Management:</ins> GAS Gameplay Tags applied to Hero and Target.
+
+- <ins>Rotation:</ins> Continuous, smooth interpolation (RInterpTo) in TickComponent
+ 
+- <ins>Switching Input:</ins> Horizontal axis of the Look Input with a Cooldown Mechanism.
 
 In-game preview:
 
 https://github.com/user-attachments/assets/86938f1b-b053-4e41-8f8f-916d75851006
 
-When activated:
-- The system performs a trace to find nearby hostile actors.
-- Gameplay tags are applied to both the hero and target to reflect the lock state.
+### **1. Activation and Deactivation**
+
+Initial Lock Acquisition (StartTargetLock):
+
+The system initiates the lock by finding the optimal initial target. This process involves a trace, filtering, and selection before applying GAS tags and enabling the component's Tick function.
+
+- <ins>Target Selection:</ins> The system executes a trace to find all hostile actors. It then calls FilterOutDeadActors to ensure only viable targets are considered, followed by FindNearestActor to select the closest one.
+
+- <ins>GAS Tag Application:</ins> Upon selection, the system applies state tags: TAG_Gameplay_State_TargetLockSystem_Hero_TargetLocked (to the Hero) and TAG_Gameplay_State_TargetLockSystem_Enemy_Targeted (to the Target).
 ```c++
-void UAC_TargetLockSystem::StartTargetLock()
+void UAC_TargetLockSystem::StartTargetLock(UGAS_AbilityTraceData* TracingData)
 {
-	if (!TracingDataStart)
+ 	if (!TracingData || HeroASC->HasMatchingGameplayTag(GAS_Tags::TAG_Gameplay_State_InCombat_Finisher))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("TargetingData is null in: %s, cannot initialize TargetLockSystem."), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("TracingData is null in: %s, cannot initialize TargetLockSystem."), *GetName());
 		return;
 	}
 
 	TArray<AActor*> OutResultActors;
-	TracingDataStart->Trace->CreateTraceWithTeamFilter(GetWorld(), HeroBase, ETeamAttitude::Hostile, OutResultActors);
-
-	if (!OutResultActors.IsValidIndex(0))
+	TracingData->Trace->CreateTraceWithTeamFilter(GetWorld(), HeroBase, ETeamAttitude::Hostile, OutResultActors);
+	if (OutResultActors.IsEmpty())
 	{
 		return;
 	}
 
-	ChangeTarget(OutResultActors[0]);
+	FilterOutDeadActors(OutResultActors);
+	AActor* ClosestTarget = FindNearestActor(HeroBase, OutResultActors);
+
+	UAbilitySystemComponent* TargetASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(ClosestTarget);
+	if (!TargetASC)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TargetASC is null in %s, cannot initialize TargetLockSystem."), *GetName());
+		return;
+	}
+
+	ChangeTarget(ClosestTarget);
 
 	HeroASC->AddLooseGameplayTag(GAS_Tags::TAG_Gameplay_State_TargetLockSystem_Hero_TargetLocked);
 	bLocked = true;
 	SetComponentTickEnabled(true);
-
 	OnStartTargetLock.Broadcast();
 }
+```
+Lock Termination:
 
+The lock can be terminated manually by the player or automatically by the system (e.g., during a Finisher or on target death). Termination ensures a clean state transition by resetting controls and removing tags.
+
+- <ins>Cleanup:</ins> All associated Gameplay Tags are removed from both the Hero and the Target. The CurrentTarget pointer is cleared, the bLocked boolean is set to false, and the component's Tick function is disabled.
+```c++
 void UAC_TargetLockSystem::EndTargetLock()
 {
 	if (!CurrentTargetASC)
@@ -103,7 +127,6 @@ void UAC_TargetLockSystem::EndTargetLock()
 
 	HeroASC->RemoveLooseGameplayTag(GAS_Tags::TAG_Gameplay_State_TargetLockSystem_Hero_TargetLocked);
 	CurrentTargetASC->RemoveLooseGameplayTag(GAS_Tags::TAG_Gameplay_State_TargetLockSystem_Enemy_Targeted);
-	CurrentTarget = nullptr;
 	bLocked = false;
 
 	OnEndTargetLock.Broadcast();
@@ -111,106 +134,47 @@ void UAC_TargetLockSystem::EndTargetLock()
 	SetComponentTickEnabled(false);
 }
 ```
-- Once a target is found, both the camera and character smoothly rotate toward it every tick.
-- While locked, players can switch targets left/right based on the horizontal input axis.
+State Management via GAS Tags:
 
+The system actively manages the lock state based on critical combat events by subscribing to GAS tag changes on the Hero:
+
+- <ins>Finisher Interruption:</ins> When the Finisher tag is added, the lock is terminated (EndTargetLock) to prevent rotation interference during the cinematic.
 ```c++
-void UAC_TargetLockSystem::LookMouse(const FInputActionValue& Value)
+void UAC_TargetLockSystem::OnHeroFinisherTagAdded(const UAbilitySystemComponent* AbilitySystemComponent, const FGameplayTag& Tag)
 {
-	if (!bLocked || HeroASC->HasMatchingGameplayTag(GAS_Tags::TAG_Gameplay_State_AbilityTargeting))
-	{
-		return;
-	}
-
-	const FVector2D VectorValue = Value.Get<FVector2D>();
-
-	// Cooldown mechanism: Each direction can only trigger the action once per second.
-	const float CurrentTime = GetWorld()->GetTimeSeconds(); 
-
-	if ((VectorValue.X > Threshold) && (CurrentTime - TryToFindNewTargetLastExecutionTimeRight >= TryToFindNewTargetExecutionCooldown))
-	{
-		TryToFindNewTarget(ETargetChangeDirection::TCD_Right);
-		TryToFindNewTargetLastExecutionTimeRight = CurrentTime;
-	}
-
-	if ((VectorValue.X < -Threshold) && (CurrentTime - TryToFindNewTargetLastExecutionTimeLeft >= TryToFindNewTargetExecutionCooldown))
-	{
-		TryToFindNewTarget(ETargetChangeDirection::TCD_Left);
-		TryToFindNewTargetLastExecutionTimeLeft = CurrentTime;
-	}
-}
-
-void UAC_TargetLockSystem::TryToFindNewTarget(TEnumAsByte<ETargetChangeDirection> TargetChangeDirection)
-{
-	if (!TracingDataTargetChange || !TracingDataCheckForFrontActor)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("TracingDataTargetChange or TracingDataCheckForFrontActor is null in: %s"), *GetName());
-		return;
-	}
-
-	if (!HeroBase) 
-	{
-		UE_LOG(LogTemp, Warning, TEXT("HeroBase is null in: %s"), *GetName());
-		return;
-	}
-
-	TArray<AActor*> OutResultActors;
-	TracingDataTargetChange->Trace->CreateTraceWithTeamFilter(GetWorld(), HeroBase, ETeamAttitude::Hostile, OutResultActors);
-
-	OutResultActors.Remove(CurrentTarget);
-
-	if (OutResultActors.IsEmpty())
-	{
-		return;
-	}
-
-	TArray<AActor*> LeftActors;
-	TArray<AActor*> RightActors;
-
-	SplitActorsByPositionRelativeToHero(OutResultActors, LeftActors, RightActors);
-
-	AActor* FoundNewTarget = nullptr;
-	if (TargetChangeDirection == ETargetChangeDirection::TCD_Left) 
-	{
-		FoundNewTarget = FindNearestActor(CurrentTarget, LeftActors);
-	}
-	else if(TargetChangeDirection == ETargetChangeDirection::TCD_Right)
-	{
-		FoundNewTarget = FindNearestActor(CurrentTarget, RightActors);
-	}
-
-	// If there is an enemy directly in the player's line of sight (viewing direction), we select it as the new target
-    // even if it's further away than the current target. This prioritizes enemies in front of the player,
-    // ensuring a more dynamic target selection based on the player's perspective.
-	if (FoundNewTarget)
-	{
-		TArray<AActor*> CheckForFrontActors;
-		FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(HeroBase->GetActorLocation(), FoundNewTarget->GetActorLocation());
-		TracingDataCheckForFrontActor->Trace->CreateTraceWithTeamFilterWithDirection(GetWorld(), HeroBase, ETeamAttitude::Hostile, LookAtRotation, CheckForFrontActors);
-		if (CheckForFrontActors.IsValidIndex(0)) 
-		{
-			// If the actor in front of the player is different from the current target, set it as the new target.
-			if (CheckForFrontActors[0] != CurrentTarget) 
-			{
-				FoundNewTarget = CheckForFrontActors[0];
-			}
-		}
-	}
-	
-	ChangeTarget(FoundNewTarget);
+	EndTargetLock();
 }
 ```
-- If the current target dies (despawns), the lock automatically ends.
 
+- <ins>Finisher Re-acquisition:</ins> When the Finisher tag is removed, the system automatically calls StartTargetLock again to immediately re-acquire and focus on the closest enemy.
 ```c++
-void UAC_TargetLockSystem::OnEnemyDeSpawn(AGAS_CharacterBase* Enemy)
+void UAC_TargetLockSystem::OnHeroFinisherTagRemoved(const UAbilitySystemComponent* AbilitySystemComponent, const FGameplayTag& Tag)
 {
-	if (Enemy == CurrentTarget) 
-	{
-		EndTargetLock();
-	}
+	StartTargetLock(TracingDataCheckClosestTarget);
 }
 ```
+
+### **2. Dynamic Target Switching**
+
+Target switching is handled via the LookMouse input action, which processes horizontal mouse movement.
+
+- <ins>Cooldown Mechanism:</ins> Switching is rate-limited using TryToFindNewTargetExecutionCooldown. An attempt is only processed if the horizontal mouse input exceeds a Threshold and the cooldown for that direction (Left/Right) has expired.
+
+- <ins>Switching Logic:</ins> The function executes a sophisticated selection algorithm that prioritizes the nearest target in the desired direction, with an override for targets directly in the player's view.
+
+### **3. Orientation and Interpolation**
+
+The TickComponent orchestrates the continuous, smooth rotation of the camera and the character.
+
+Camera Rotation: 
+
+- <ins>Smooth Look:</ins> The camera's control rotation is smoothly interpolated towards the target using UKismetMathLibrary::RInterpTo and RotateInterpSpeed.
+
+- <ins>Pitch Clamping:</ins> The RotateCameraToTargetClampPitch function enforces strict angle limits on the camera's pitch (MinPitchA, MaxPitchA, etc.). This prevents the camera from entering visually unappealing or disruptive angles, ensuring a comfortable player experience.
+
+Character Rotation 
+
+- <ins>Yaw-Only Update:</ins> The Hero's actor rotation is interpolated towards the target's location. Critically, only the Yaw axis is updated, preserving the Pitch and Roll to avoid conflicts with movement and animation logic.
 
 
 ## Combat Abilities
