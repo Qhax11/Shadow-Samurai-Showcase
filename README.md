@@ -1129,6 +1129,7 @@ Data-Driven Design: Movement Chain Assets
 The entire movement decision process is driven by three key Data Assets 
 
 - <ins>UMovementChainAsset:</ins> Defines a `single, specific sequence of movement abilities` (the "chain"). Contains all scoring modifiers and constraints (Min Range, Score Bias, etc.) needed by the service to evaluate its utility.
+![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
 ```c++
 UCLASS(BlueprintType)
 class UMovementChainAsset : public UPrimaryDataAsset
@@ -1163,6 +1164,7 @@ public:
 ```
 
 - <ins>FAttackAbilityMovementChains:</ins> Maps a single `Attack Ability Class` to an array of UMovementChainAsset instances. This defines the pool of possible movement chains for that specific attack.
+![Ekran görüntüsü 2025-04-08 203016](https://github.com/user-attachments/assets/0d3c1f2a-014f-401c-aa8c-e54f421c2181)
 ```c++
 USTRUCT(BlueprintType)
 struct FAttackAbilityMovementChains
@@ -1340,10 +1342,55 @@ bool UBDS_GetBestMovementChain::ApplyDirectionPoliciesToSelectedMovementChain(UM
 ```
 
 #### **2.2.3 Get Best Attack** 
+The `UBDS_GetBestAttack` is a specialized service designed to select the `most optimal offensive ability` for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key tactical factors, ensuring the AI's actions are precise and well-timed.
 
-The `UBDS_GetBestAttack` is a specialized service designed to select the `most optimal offensive ability` for the AI from a list of possibilities. It operates by dynamically scoring each potential attack based on several key factors, ensuring the AI's actions are tactical and well-timed.
+Data-Driven Design: Attack Data Assets
 
-- <ins>Dynamic Scoring & Decision Logic:</ins> This service works by assigning a score to each potential attack. The attack with the highest final score is chosen.
+The attack selection process is driven by the following Data Asset structures, which allow designers to configure attack properties and scoring biases via the editor:
+
+![image](https://github.com/user-attachments/assets/ee2008a4-0939-410b-a892-146fd0b9d1c9)
+
+- <ins>FAttackData:</ins> Defines the parameters for a single attack ability, including its `AbilityClass`, `ScoreBias`, and `ComboIndex` information.
+```c++
+USTRUCT(BlueprintType)
+struct FAttackData
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Ability class that defines the actual gameplay logic and range values"))
+    TSubclassOf<class UGAS_GameplayAbilityBase> AbilityClass;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Optional score modifiers per behavior state"))
+    TMap<EBehaviorState, float> BehaviorStateScoreModifiers;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Whether this attack is part of a combo chain"))
+    bool bIsComboAttack;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Combo index used for ordering within a combo chain "), meta = (EditCondition = "bIsComboAttack"))
+    int32 ComboIndex = 0;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ToolTip = "Base score bias applied to AI decision-making"))
+    float ScoreBias = 0.f;
+};
+```
+
+- <ins>UAttackAbilityAsset:</ins> The primary container. Holds an array of all possible `FAttackData` structures the AI can choose from.
+```c++
+UCLASS(BlueprintType)
+class UAttackAbilityAsset : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<FAttackData> AttackAbilities;
+};
+```
+
+Dynamic Scoring & Decision Logic
+
+- <ins>GetBestAttack:</ins> The `GetBestAttack()` function orchestrates the attack selection process. It iterates through all available attacks, performs a `Cooldown Check`, calculates `Distance` and `Combo` scores, and selects the one with the highest total utility.
 ```c++
 FAttackData UBDS_GetBestAttack::GetBestAttack()
 {
@@ -1383,25 +1430,14 @@ FAttackData UBDS_GetBestAttack::GetBestAttack()
         }
     }
 
-    /*
-    if (GEngine && EnableSelectedDebug)
-    {
-        GEngine->AddOnScreenDebugMessage(9, 3.5f, FColor::Red,
-            FString::Printf(TEXT(">> Selected Attack: %s | DistanceScore: %.1f"),
-                *BestAttack.AbilityClass->GetName(), BestAttackDistanceScore));
-    }
-    */
-
     LastSelectedAttackAbilityData = BestAttack;
     return BestAttack;
 }
 ```
  
- The score is calculated by combining multiple factors:
+Scoring Components:
 
-- Cooldown & Validity Check: The service first checks if an attack is on `cooldown`. If it is, the attack is immediately disregarded, ensuring the AI only considers abilities that are ready to use.
-
-- Distance Scoring: The `CalculateAttackAbilityScoreBasedOnTargetDistance()` function evaluates the attack's effectiveness based on the distance to the target. It assigns a higher score to attacks that are a more appropriate range. For instance, a melee attack will receive a high score when the AI is close to the player, while a ranged attack will get a higher score when the player is farther away.
+- <ins>Distance Scoring:</ins> The `CalculateAttackAbilityScoreBasedOnTargetDistance()` function calculates a score based on how close the target is to the attack's `ideal range` (AbilityMaxRange). The closer the target is to the ideal range, the higher the score. A vital safety check is performed: if the distance is `below the attack's` MinRange, a hard penalty (-100) is applied, preventing the AI from selecting attacks for which it is too close.
 ```c++
 float UBDS_GetBestAttack::CalculateAttackAbilityScoreBasedOnTargetDistance(FAttackData AttackData, float DistanceToTarget)
 {
@@ -1428,7 +1464,7 @@ float UBDS_GetBestAttack::CalculateAttackAbilityScoreBasedOnTargetDistance(FAtta
 }
 ```
 
-- Combo Scoring: The `CalculateComboScore()` function is a crucial part of the system that adds depth and fluidity to the AI's behavior. If the AI has just finished an attack that is part of a combo chain, this function gives a significant score bonus to the next logical attack in that sequence. This prevents the AI from choosing random abilities and allows it to perform coherent, multi-step attack patterns.
+- <ins>Combo Scoring:</ins> The `CalculateComboScore()` function is essential for creating fluid, sequential attack patterns. It checks if the previously selected attack (`LastSelectedAttackAbilityData`) was part of a combo. If so, it gives a `significant score bonus` (`+100.0f`) to the current candidate if it represents the `next logical` step (`ComboIndex + 1`) in that sequence. This strongly biases the AI towards completing combos once initiated.
 ```c++
 float UBDS_GetBestAttack::CalculateComboScore(FAttackData AttackData)
 {
@@ -1457,14 +1493,35 @@ float UBDS_GetBestAttack::CalculateComboScore(FAttackData AttackData)
 }
 ```
 
-The final score for each attack is a combination of these scores and a pre-defined ScoreBias. The service then selects the attack with the highest total score, ensuring a dynamic and intelligent choice every time.
-
 #### **2.2.4 Get Best InComingAttack Reaction** 
+The `UBDS_ComingAttackReactionBase` is the AI's specialized defensive decision-making service. It is a `foundational abstract class` designed to evaluate an incoming attack and select the `best possible defensive action` (e.g., `Parry`, `Dodge`, or `Take Damage`). This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently and unpredictably to a player's attacks
 
-Coming Attack Reaction Decision Service
-The `UBDS_ComingAttackReactionBase` is the AI's specialized defensive decision-making service. It is designed to evaluate an incoming attack and select the `best possible defensive action`, such as a `parry`, `dodge`, or `taking damage`. This service is a core component of the AI's reactive behavior, ensuring it can respond intelligently to a player's attacks.
+Data-Driven Design: UBDS_ComingAttackReactionBase 
 
-- Dynamic Scoring & Decision Logic: This service works by assigning a score to each potential defensive reaction. The reaction with the `highest final score is chosen`. The score is calculated by combining multiple factors:
+Unlike other services, this class is both the Base Service and the Data Container. Specific defensive reactions (Parry, Dodge) are instantiated as children of this class and grouped inside the UComingAttackReactionAsset.
+
+- <ins>UBDS_ComingAttackReactionBase:</ins> Defines scoring functions, chance roll logic, and required timing parameters (e.g., `MinimumTimeBeforeHitToReact`).
+```c++
+UCLASS(Blueprintable, DefaultToInstanced, EditInLineNew)
+class GAS_TEMPLATESP_API UBDS_ComingAttackReactionBase : public UBehaviorDecisionServiceBase
+```
+
+- <ins>UComingAttackReactionAsset:</ins> The primary container. Holds an array of `instantiated` `UBDS_ComingAttackReactionBase` children (the specific defensive actions) that the AI will evaluate.
+```c++
+UCLASS(BlueprintType)
+class UComingAttackReactionAsset : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+    TArray<TObjectPtr<UBDS_ComingAttackReactionBase>> ComingAttackReactions;
+};
+```
+
+Dynamic Scoring Logic:
+
+Individual reaction services (derived from this base class) are scored based on the incoming attack's context (`FComingAttackPayload`). The `CalculateComingAttackReactionScore()` function sums the relevant weighted scores, with the final selection being the reaction that yields the highest total score
 ```c++
 float UBDS_ComingAttackReactionBase::CalculateComingAttackReactionScore(FComingAttackPayload ComingAttackPayload)
 {
@@ -1478,7 +1535,9 @@ float UBDS_ComingAttackReactionBase::CalculateComingAttackReactionScore(FComingA
 }
 ```
 
-- Behavior State Score: `CalculateBehaviorStateScore()` adjusts the score based on the AI's current `BehaviorState` (e.g., `Aggressive`, `Defensive`). This allows you to create defensive reactions that are preferred for specific tactical situations.
+Scoring Components:
+
+- <ins>Behavior State Score:</ins> The `CalculateBehaviorStateScore()` function integrates the AI's current `BehaviorState` into the decision. By utilizing `BehaviorStateScoreModifiers`, designers can prioritize specific defensive reactions (e.g., favoring `Parry` when Aggressive) based on the AI's current tactical role
 ```c++
 float UBDS_ComingAttackReactionBase::CalculateBehaviorStateScore() const
 {
@@ -1491,7 +1550,7 @@ float UBDS_ComingAttackReactionBase::CalculateBehaviorStateScore() const
 }
 ```
 
-- Tag Score: `CalculateTagScore()` gives a score bonus based on the tags associated with the incoming attack. For instance, an attack with a `HeavyAttack` tag might increase the score of a Parry reaction, while a `LightAttack` tag might increase the score of a `Dodge` reaction.
+- <ins>Tag Score:</ins> The `CalculateTagScore()` function applies a score bonus based on the `GameplayTags` associated with the incoming attack. This ensures the AI chooses the appropriate defense for the type of threat (e.g., scoring `Parry` higher if the incoming attack is tagged `HeavyAttack`).
 ```c++
 float UBDS_ComingAttackReactionBase::CalculateTagScore(const FComingAttackPayload ComingAttackPayload) const
 {
@@ -1509,7 +1568,19 @@ float UBDS_ComingAttackReactionBase::CalculateTagScore(const FComingAttackPayloa
 }
 ```
 
-- Chance Roll: The `PassesFinalChanceRoll()` function adds an element of unpredictability to the AI's decisions. For a Parry reaction, the chance to succeed is based on the AI's Posture value, while for a Dodge reaction, it is based on a pre-defined `BaseChance`. This adds depth to the system and prevents the AI from becoming too predictable.
+Execution Precision and Unpredictability:
+
+Before the winning reaction is executed, two critical checks are performed: an `Enable Check` based on timing, and a `Chance Roll` to introduce realistic unpredictability.
+
+- <ins>Enable Check:</ins> The `IsEnable()` function is a critical check that prevents the AI from attempting actions that it cannot complete in time. The reaction is only considered if the time to impact (`ComingAttackHitTime`) is greater than the `MinimumTimeBeforeHitToReact` required by that defensive action, AND it passes the chance roll.
+```c++
+bool UBDS_ComingAttackReactionBase::IsEnable(FComingAttackPayload ComingAttackPayload) const
+{
+    return PassesFinalChanceRoll() && ComingAttackPayload.ComingAttackHitTime > MinimumTimeBeforeHitToReact;
+}
+```
+
+- <ins>Chance Roll:</ins> The `PassesFinalChanceRoll()` function adds an element of unpredictability to the AI's decisions. For a Parry reaction, the chance to succeed is based on the AI's Posture value, while for a Dodge reaction, it is based on a pre-defined `BaseChance`. This adds depth to the system and prevents the AI from becoming too predictable.
 ```c++
 bool UBDS_ComingAttackReactionBase::PassesFinalChanceRoll() const
 {
@@ -1527,21 +1598,17 @@ bool UBDS_ComingAttackReactionBase::PassesFinalChanceRoll() const
         return true;
     }
 }
-
+```
+```c++
 bool UBDS_ComingAttackReactionBase::PassesChanceRoll() const
 {
     const float Roll = FMath::FRandRange(0.f, 1.f);  
     const bool bPassed = Roll <= BaseChance;
 
-    UE_LOG(LogTemp, Log, TEXT("[AI] Static chance reaction %s: roll %.2f <= base chance %.2f → %s"),
-        *ComingAttackReactionName.ToString(),
-        Roll,
-        BaseChance,
-        bPassed ? TEXT("PASS") : TEXT("FAIL"));
-
     return bPassed;
 }
-
+```
+```c++
 bool UBDS_ComingAttackReactionBase::PassesChanceRollBasedOnPosture() const
 {
     UAS_Base* BaseAttributes = const_cast<UAS_Base*>(EnemyASC->GetSet<UAS_Base>());
@@ -1555,62 +1622,9 @@ bool UBDS_ComingAttackReactionBase::PassesChanceRollBasedOnPosture() const
 
     const bool bPassed = Roll <= PostureValue;
 
-    UE_LOG(LogTemp, Log, TEXT("[AI] Posture-based reaction %s: roll %.2f <= posture %.2f → %s"),
-        *ComingAttackReactionName.ToString(),
-        Roll,
-        PostureValue,
-        bPassed ? TEXT("PASS") : TEXT("FAIL"));
-
     return bPassed;
 }
 ```
-
-- Execution with Precision: The `IsEnable()` function is a critical check that ensures the AI has enough time to react. If the time to impact is less than the `MinimumTimeBeforeHitToReact`, the reaction is not considered, preventing the AI from attempting actions that it cannot complete in time.
-```c++
-bool UBDS_ComingAttackReactionBase::IsEnable(FComingAttackPayload ComingAttackPayload) const
-{
-    return PassesFinalChanceRoll() && ComingAttackPayload.ComingAttackHitTime > MinimumTimeBeforeHitToReact;
-}
-```
-
-The final score for each reaction is a combination of these scores and a pre-defined `ScoreBias`. The service then selects the reaction with the highest total score, ensuring a dynamic and intelligent defensive choice every time.
-
-#### **3.2 Scoring** 
-
-Every decision within the system is driven by a dynamic scoring mechanism. Services evaluate all available options and select the one with the highest score, which is calculated based on multiple factors.
-
-- Attack Selection Logic:
-The UBDS_GetBestAttack service evaluates potential attacks by a combination of scores:
-
-- Cooldown & Validity: It first checks if an ability is on cooldown. If it is, the ability is immediately disqualified from consideration.
-
-- Distance Scoring: The CalculateAttackAbilityScoreBasedOnTargetDistance function uses a custom formula to favor attacks whose effective range (MaxRange) closely matches the current distance to the player.
-
-- Combo Scoring: This is a crucial part of creating fluid AI attacks. The CalculateComboScore function assigns a very high score (100.0f) to an attack if it is the next step in a combo chain, encouraging the AI to complete its attack sequences.
-
-- Score Bias: A designer-adjustable value that allows manual prioritization of certain attacks.
-
-
-![image](https://github.com/user-attachments/assets/ee2008a4-0939-410b-a892-146fd0b9d1c9)
-
- - Distance to Target: A higher score is given if the attack's effective range matches the current distance to the player.
-
- - Cooldown Status: Abilities on cooldown are given a score of negative infinity to ensure they are never selected.
-
- - Score Bias: A designer-adjustable value to manually prioritize certain attacks over others.
-
- - GetBestMovementChain(...): Picks the optimal movement chain to accompany the selected attack. This score is influenced by:
-
-![Ekran görüntüsü 2025-04-08 203016](https://github.com/user-attachments/assets/0d3c1f2a-014f-401c-aa8c-e54f421c2181)
-
-![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
-
- - Distance: The score is boosted if the movement chain will put the AI in an ideal range for its next attack.
-
- - Target Movement: The AI's movement score changes based on whether the player is moving, allowing the AI to react intelligently by either closing the gap or creating distance.
-
-- Direction Policies:
-This system adds another layer of complexity by allowing the AI to dynamically choose its movement direction. The movement chain's direction (e.g., move left, move right, roll forward) is determined at runtime based on defined policies. This includes reacting to the player's last movement direction or randomizing its own movement for unpredictable behavior.
 
 ## **3. The Execution Layer** 
 The most robust tactical decision is worthless if the system cannot translate it into precise, reliable physical action. This layer is responsible for taking the winning `Movement Chain` or `Attack Ability` selected by the `Behavior Decision Component` and executing it flawlessly in the game world, leveraging the power and reliability of the` Gameplay Ability System (GAS`).
