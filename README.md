@@ -69,14 +69,14 @@ In-game preview:
 https://github.com/user-attachments/assets/86938f1b-b053-4e41-8f8f-916d75851006
 
 ### **1. Activation and Deactivation**
+The lock state is toggled via an input action (IA_ActivateTargetLock).
 
-Initial Lock Acquisition (StartTargetLock):
-
+#### **1.1 Initial Lock Acquisition**
 The system initiates the lock by finding the optimal initial target. This process involves a trace, filtering, and selection before applying GAS tags and enabling the component's Tick function.
 
 - <ins>Target Selection:</ins> The system executes a trace to find all hostile actors. It then calls FilterOutDeadActors to ensure only viable targets are considered, followed by FindNearestActor to select the closest one.
 
-- <ins>GAS Tag Application:</ins> Upon selection, the system applies state tags: TAG_Gameplay_State_TargetLockSystem_Hero_TargetLocked (to the Hero) and TAG_Gameplay_State_TargetLockSystem_Enemy_Targeted (to the Target).
+- <ins>GameplayTag Application:</ins> Upon selection, the system applies state tags: `TAG_Gameplay_State_TargetLockSystem_Hero_TargetLocked` (to the Hero) and `TAG_Gameplay_State_TargetLockSystem_Enemy_Targeted` (to the Target).
 ```c++
 void UAC_TargetLockSystem::StartTargetLock(UGAS_AbilityTraceData* TracingData)
 {
@@ -111,8 +111,7 @@ void UAC_TargetLockSystem::StartTargetLock(UGAS_AbilityTraceData* TracingData)
 	OnStartTargetLock.Broadcast();
 }
 ```
-Lock Termination:
-
+#### **1.2 Lock Termination**
 The lock can be terminated manually by the player or automatically by the system (e.g., during a Finisher or on target death). Termination ensures a clean state transition by resetting controls and removing tags.
 
 - <ins>Cleanup:</ins> All associated Gameplay Tags are removed from both the Hero and the Target. The CurrentTarget pointer is cleared, the bLocked boolean is set to false, and the component's Tick function is disabled.
@@ -134,7 +133,7 @@ void UAC_TargetLockSystem::EndTargetLock()
 	SetComponentTickEnabled(false);
 }
 ```
-State Management via GAS Tags:
+#### **1.3 State Management via GAS Tags**
 
 The system actively manages the lock state based on critical combat events by subscribing to GAS tag changes on the Hero:
 
@@ -166,14 +165,14 @@ Target switching is handled via the LookMouse input action, which processes hori
 
 The TickComponent orchestrates the continuous, smooth rotation of the camera and the character.
 
+#### **3.1 Camera Rotation**
 Camera Rotation: 
 
 - <ins>Smooth Look:</ins> The camera's control rotation is smoothly interpolated towards the target using UKismetMathLibrary::RInterpTo and RotateInterpSpeed.
 
 - <ins>Pitch Clamping:</ins> The RotateCameraToTargetClampPitch function enforces strict angle limits on the camera's pitch (MinPitchA, MaxPitchA, etc.). This prevents the camera from entering visually unappealing or disruptive angles, ensuring a comfortable player experience.
 
-Character Rotation 
-
+#### **3.2 Character Rotation **
 - <ins>Yaw-Only Update:</ins> The Hero's actor rotation is interpolated towards the target's location. Critically, only the Yaw axis is updated, preserving the Pitch and Roll to avoid conflicts with movement and animation logic.
 
 
