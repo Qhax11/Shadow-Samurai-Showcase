@@ -1193,9 +1193,7 @@ public:
 };
 ```
 
-
 ![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
-
 
 Dynamic Scoring & Decision Logic:
 
@@ -1352,7 +1350,18 @@ Data-Driven Design: Attack Data Assets
 
 The attack selection process is driven by the following Data Asset structures, which allow designers to configure attack properties and scoring biases via the editor:
 
-![image](https://github.com/user-attachments/assets/ee2008a4-0939-410b-a892-146fd0b9d1c9)
+- <ins>UAttackAbilityAsset:</ins> The primary container. Holds an array of all possible `FAttackData` structures the AI can choose from.
+```c++
+UCLASS(BlueprintType)
+class UAttackAbilityAsset : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<FAttackData> AttackAbilities;
+};
+```
 
 - <ins>FAttackData:</ins> Defines the parameters for a single attack ability, including its `AbilityClass`, `ScoreBias`, and `ComboIndex` information.
 ```c++
@@ -1379,18 +1388,7 @@ public:
 };
 ```
 
-- <ins>UAttackAbilityAsset:</ins> The primary container. Holds an array of all possible `FAttackData` structures the AI can choose from.
-```c++
-UCLASS(BlueprintType)
-class UAttackAbilityAsset : public UPrimaryDataAsset
-{
-    GENERATED_BODY()
-
-public:
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    TArray<FAttackData> AttackAbilities;
-};
-```
+![image](https://github.com/user-attachments/assets/ee2008a4-0939-410b-a892-146fd0b9d1c9)
 
 Dynamic Scoring & Decision Logic
 
