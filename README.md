@@ -38,7 +38,7 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
                - [Attack State](#123-Attack-State)
                - [InComingAttack State](#124-InComingAttack-State)
           - [Intend Handler](#13-Intend-Handler)
-     - [The Behavior Decision and Scoring](#2-Behavior-Decision-and-Scoring)
+     - [The Behavior Decision and Scoring](#2-The-Behavior-Decision-and-Scoring)
           - [Behavior Decision](#21-Behavior-Decision)
           - [Services](#22-Services)
                - [Service Base](#221-Service-Base)
