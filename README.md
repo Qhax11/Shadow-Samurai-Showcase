@@ -1142,8 +1142,6 @@ public:
 ```
 
 - <ins>FAttackAbilityMovementChains:</ins> Maps a single `Attack Ability Class` to an array of UMovementChainAsset instances. This defines the pool of possible movement chains for that specific attack.
-  
-![Ekran görüntüsü 2025-04-08 203016](https://github.com/user-attachments/assets/0d3c1f2a-014f-401c-aa8c-e54f421c2181)
 ```c++
 USTRUCT(BlueprintType)
 struct FAttackAbilityMovementChains
@@ -1159,9 +1157,9 @@ public:
 };
 ```
 
+![Ekran görüntüsü 2025-04-08 203016](https://github.com/user-attachments/assets/0d3c1f2a-014f-401c-aa8c-e54f421c2181)
+
 - <ins>UMovementChainAsset:</ins> Defines a `single, specific sequence of movement abilities` (the "chain"). Contains all scoring modifiers and constraints (Min Range, Score Bias, etc.) needed by the service to evaluate its utility.
-  
-![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
 ```c++
 UCLASS(BlueprintType)
 class UMovementChainAsset : public UPrimaryDataAsset
@@ -1194,6 +1192,8 @@ public:
     float ScoreBias = 0.f;
 };
 ```
+
+![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
 
 Dynamic Scoring & Decision Logic:
 
