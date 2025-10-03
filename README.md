@@ -161,17 +161,108 @@ Target switching is handled via the LookMouse input action, which processes hori
 
 ### **3. Orientation and Interpolation**
 The TickComponent orchestrates the continuous, smooth rotation of the camera and the character.
+```c++
+void UAC_TargetLockSystem::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	RotateCameraToTarget(DeltaTime);
+	RotateHeroToTarget(DeltaTime);
+}
+```
 
 #### **3.1 Camera Rotation**
 
 - <ins>Smooth Look:</ins> The camera's control rotation is smoothly interpolated towards the target using UKismetMathLibrary::RInterpTo and RotateInterpSpeed.
+```c++
+void UAC_TargetLockSystem::RotateCameraToTarget(float DeltaTime)
+{
+	if (!HeroBase || !CurrentTarget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HeroBase or CurrentTarget null in: %s"), *GetName());
+		return;
+	}
+
+	FVector CurrentTargetLocation = CurrentTarget->GetActorLocation();
+	CurrentTargetLocation.Z = CurrentTargetLocation.Z - CameraLookLocationOffsetZ;
+
+	FRotator LookAtTargetRotation = UKismetMathLibrary::FindLookAtRotation(HeroBase->GetActorLocation(), CurrentTargetLocation);
+
+	// Get the current camera rotation and interpolate towards the target for smooth transition
+	FRotator CurrentCameraRotation = HeroBase->GetControlRotation();
+	FRotator NewCameraRotation = UKismetMathLibrary::RInterpTo(CurrentCameraRotation, LookAtTargetRotation, DeltaTime, RotateInterpSpeed);
+
+	NewCameraRotation.Pitch = RotateCameraToTargetClampPitch(NewCameraRotation.Pitch);
+
+	HeroBase->GetController()->SetControlRotation(NewCameraRotation);
+}
+```
 
 - <ins>Pitch Clamping:</ins> The RotateCameraToTargetClampPitch function enforces strict angle limits on the camera's pitch (MinPitchA, MaxPitchA, etc.). This prevents the camera from entering visually unappealing or disruptive angles, ensuring a comfortable player experience.
+```c++
+float UAC_TargetLockSystem::RotateCameraToTargetClampPitch(float NewPitch)
+{
+	// Normalize pitch to the range [0, 360]
+	NewPitch = FMath::Fmod(NewPitch + 360.0f, 360.0f);
+
+	// Check for looking up from below, NewPitch value is between MinPitchA and MaxPitchA
+	if (NewPitch >= MinPitchA && NewPitch <= MaxPitchA)
+	{
+		NewPitch = FMath::Clamp(NewPitch, MinPitchA, MaxPitchA);
+		return NewPitch;
+	}
+	// Check for looking down from above, NewPitch value is between MinPitchB and MaxPitchB
+	else if (NewPitch >= MinPitchB && NewPitch <= MaxPitchB)
+	{
+		NewPitch = FMath::Clamp(NewPitch, MinPitchB, MaxPitchB);
+		return NewPitch;
+	}
+	// NewPitch value is between MaxPitchA and MinPitchB
+	else
+	{
+		float NewPitchDistanceToMaxPitchA = FMath::Abs(NewPitch - MaxPitchA);
+		float NewPitchDistanceToMinPitchB = FMath::Abs(NewPitch - MinPitchB);
+		// If closer to MaxPitchA degrees 
+		if (NewPitchDistanceToMaxPitchA < NewPitchDistanceToMinPitchB)
+		{
+			NewPitch = MaxPitchA;
+			return NewPitch;
+		}
+		// If closer to MinPitchB degrees
+		else 
+		{
+			NewPitch = MinPitchB;
+			return NewPitch;
+		}
+	}
+}
+```
 
 #### **3.2 Character Rotation**
 
 - <ins>Yaw-Only Update:</ins> The Hero's actor rotation is interpolated towards the target's location. Critically, only the Yaw axis is updated, preserving the Pitch and Roll to avoid conflicts with movement and animation logic.
+```c++
+void UAC_TargetLockSystem::RotateHeroToTarget(float DeltaTime)
+{
+	if (!HeroBase || !CurrentTarget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HeroBase or CurrentTarget null in: %s"), *GetName());
+		return;
+	}
 
+	FVector CurrentTargetLocation = CurrentTarget->GetActorLocation();
+	FRotator LookAtTargetRotation = UKismetMathLibrary::FindLookAtRotation(HeroBase->GetActorLocation(), CurrentTargetLocation);
+
+	FRotator CurrentHeroRotation = HeroBase->GetActorRotation();
+	FRotator NewHeroRotation = UKismetMathLibrary::RInterpTo(CurrentHeroRotation, LookAtTargetRotation, DeltaTime, RotateInterpSpeed);
+
+	// Set the new rotation, but only update Yaw (Left-Right rotation), keep Pitch and Roll unchanged
+	NewHeroRotation.Pitch = CurrentHeroRotation.Pitch;
+	NewHeroRotation.Roll = CurrentHeroRotation.Roll;
+
+	HeroBase->SetActorRotation(NewHeroRotation);
+}
+```
 
 ## Combat Abilities
 Characters can take damage from various sources, including environmental hazards and enemy attacks. Players can also deal damage using abilities or other gameplay mechanisms. The system includes UI elements that display the amount of damage taken or dealt, providing feedback to the player during combat.
