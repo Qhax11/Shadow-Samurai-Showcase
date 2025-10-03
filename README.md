@@ -1193,7 +1193,9 @@ public:
 };
 ```
 
+
 ![Ekran görüntüsü 2025-04-08 203150](https://github.com/user-attachments/assets/86c9b586-279b-4f5f-970e-aac7f4be6cf1)
+
 
 Dynamic Scoring & Decision Logic:
 
