@@ -134,7 +134,6 @@ void UAC_TargetLockSystem::EndTargetLock()
 }
 ```
 #### **1.3 State Management via GAS Tags**
-
 The system actively manages the lock state based on critical combat events by subscribing to GAS tag changes on the Hero:
 
 - <ins>Finisher Interruption:</ins> When the Finisher tag is added, the lock is terminated (EndTargetLock) to prevent rotation interference during the cinematic.
@@ -154,7 +153,6 @@ void UAC_TargetLockSystem::OnHeroFinisherTagRemoved(const UAbilitySystemComponen
 ```
 
 ### **2. Dynamic Target Switching**
-
 Target switching is handled via the LookMouse input action, which processes horizontal mouse movement.
 
 - <ins>Cooldown Mechanism:</ins> Switching is rate-limited using TryToFindNewTargetExecutionCooldown. An attempt is only processed if the horizontal mouse input exceeds a Threshold and the cooldown for that direction (Left/Right) has expired.
@@ -162,17 +160,16 @@ Target switching is handled via the LookMouse input action, which processes hori
 - <ins>Switching Logic:</ins> The function executes a sophisticated selection algorithm that prioritizes the nearest target in the desired direction, with an override for targets directly in the player's view.
 
 ### **3. Orientation and Interpolation**
-
 The TickComponent orchestrates the continuous, smooth rotation of the camera and the character.
 
 #### **3.1 Camera Rotation**
-Camera Rotation: 
 
 - <ins>Smooth Look:</ins> The camera's control rotation is smoothly interpolated towards the target using UKismetMathLibrary::RInterpTo and RotateInterpSpeed.
 
 - <ins>Pitch Clamping:</ins> The RotateCameraToTargetClampPitch function enforces strict angle limits on the camera's pitch (MinPitchA, MaxPitchA, etc.). This prevents the camera from entering visually unappealing or disruptive angles, ensuring a comfortable player experience.
 
-#### **3.2 Character Rotation **
+#### **3.2 Character Rotation**
+
 - <ins>Yaw-Only Update:</ins> The Hero's actor rotation is interpolated towards the target's location. Critically, only the Yaw axis is updated, preserving the Pitch and Roll to avoid conflicts with movement and animation logic.
 
 
