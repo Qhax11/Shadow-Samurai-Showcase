@@ -271,17 +271,63 @@ void UAC_TargetLockSystem::RotateHeroToTarget(float DeltaTime)
 Characters can take damage from various sources, including environmental hazards and enemy attacks. Players can also deal damage using abilities or other gameplay mechanisms. The system includes UI elements that display the amount of damage taken or dealt, providing feedback to the player during combat.
 
 ### **1. Combo Abilities**
-The combo system is designed to handle sequenced melee attacks, using a data-driven structure that supports chaining multiple abilities in order. Each combo chain is defined in a Data Asset, which specifies the ability class, montage section, and range.
+The Melee Combo System is a core offensive mechanic designed to manage sequential melee attacks. It uses a highly data-driven approach built on the Gameplay Ability System (GAS) for robust state control and execution flow.
 
 In-game preview:
 
 https://github.com/user-attachments/assets/0308b885-7e32-4ee0-942d-bd06d70460e6
 
+Data-Driven Design: Combo Chain Definition
 
+Attack sequences are defined entirely within Data Assets, giving designers complete control over the attack flow and allowing for easy configuration without code changes.
 
-When a combo starts:
+- <ins>Data Asset Container:</ins> `UComboChainAsset` is the primary container, holding an array of all possible `FComboChainData` sequences (e.g., Light Combo, Heavy Combo) available to the character.
+ ```c++
+UCLASS(BlueprintType)
+class UComboChainAsset : public UDataAsset
+{
+	GENERATED_BODY()
 
-- A ComboChainTracker is initialized with the selected ability sequence.
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FComboChainData> ComboChains;
+};
+```
+
+- <ins>Sequence Structure:</ins> Each `FComboChainData` defines a full sequence of strikes, which consists of an array of `FComboAbilityData`.
+ ```c++
+USTRUCT(BlueprintType)
+struct FComboChainData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName ComboChainName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FComboAbilityData> ComboAbilities;
+};
+```
+
+- <ins>Strike Implementation:</ins> Each `FComboAbilityData` specifies the `TSubclassOf<UGA_ComboMeleeAttack>` class responsible for the gameplay logic and range values of that individual strike.
+ ```c++
+USTRUCT(BlueprintType)
+struct FComboAbilityData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSubclassOf<UGA_ComboMeleeAttack> ComboAbilityClass;
+};
+```
+
+2. Combo State Management and Execution:
+
+The entire process is managed by the UAC_MeleeComboManager component, which uses the central FActiveComboChainTracker struct to maintain the combo's progression and runtime state.
+
+2.1 State Tracking (FActiveComboChainTracker):
+
+This struct is the single source of truth for the active combo sequence, holding all necessary runtime references and control flags.
 
  ```c++
 USTRUCT()
@@ -307,6 +353,9 @@ struct FActiveComboChainTracker
 	UPROPERTY()
 	bool bNextAttackAllowed = true;
 
+	UPROPERTY()
+	bool bIsActive = false;
+
 	bool IsCurrentComboValid() const
 	{
 		return ComboChain.ComboAbilities.IsValidIndex(CurrentIndex);
@@ -330,33 +379,28 @@ struct FActiveComboChainTracker
 	void Reset()
 	{
 		CurrentIndex = 0;
+		CurrentAbilityClass = nullptr;
+		CurrentAbilityInstance = nullptr;
+		CurrentAbilitySpecHandle = FGameplayAbilitySpecHandle();
+		bNextAttackAllowed = true;
+		bIsActive = false;
 	}
 };
-
-void UAC_HeroMeleeComboManager::InitComboChainTracker()
-{
-	if (!ComboChainAsset || !ComboChainAsset->ComboChains.IsValidIndex(SelectedComboIndex))
-	{
-		return;
-	}
-
-	ActiveComboChainTracker.ComboChain = ComboChainAsset->ComboChains[SelectedComboIndex];
-	ActiveComboChainTracker.CurrentIndex = 0;
-
-	const FComboAbilityData* FirstCombo = ActiveComboChainTracker.GetCurrentCombo();
-	if (FirstCombo)
-	{
-		ActiveComboChainTracker.CurrentAbilityClass = FirstCombo->ComboAbilityClass;
-	}
-}
 ```
+
+3. Execution Flow and Timing
+
+Each strike in the sequence is executed as a separate UGA_ComboMeleeAttack derived ability. The system's robustness lies in its precise control over the timing between attacks.
 
 - Each attack is a separate UGA_ComboMeleeAttack derived ability.
 
 - ![image](https://github.com/user-attachments/assets/6b1d9c79-12cf-475f-8197-fe3aeb29f019)
 
-- After an animation event is triggered (e.g. “CanExecuteNext”), the system allows activating the next ability in the chain.
+3.1 Progression Timing via GAS Events:
 
+The moment the player can input the next attack is controlled by the animation's timeline, not by fixed engine delays.
+
+- <ins>Event Signal:</ins> The active ability (UGA_ComboMeleeAttack) listens for the animation event tag TAG_Gameplay_AttackEvent_CanActivateNextAttack.
 ```c++
 void UGA_ComboMeleeAttack::OnEventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
 {
@@ -371,8 +415,15 @@ void UGA_ComboMeleeAttack::OnEventReceived(FGameplayTag EventTag, FGameplayEvent
 }
 ```
 
-- If the chain completes or is interrupted, it resets.
+- <ins>Input Re-enabling:</ins> Upon receiving this event, the ability broadcasts a delegate (OnCanExecuteNextAttack.Broadcast()) which signals the manager to set bNextAttackAllowed = true, granting the player a window to transition to the next strike
 
+3.2. Combo Termination
+
+The combo chain is designed to reset for two primary reasons: successful completion or interruption. The OnComboMeleeAttackAbilityEnd function handles the finalization logic.
+
+- <ins>Successful End:</ins> If the ability ends normally (!EndedData.bWasCancelled), it is assumed the sequence is complete, and ActiveComboChainTracker.Reset() is called.
+
+- <ins>Cancellation:</ins> If the ability is cancelled (EndedData.bWasCancelled), the system verifies if the index had already advanced to the end (IsChainFinished()). Regardless, the tracker is reset to ensure a clean state for the next input.
 ```c++
 void UAC_HeroMeleeComboManager::OnComboMeleeAttackAbilityEnd(const FAbilityEndedData& EndedData)
 {
