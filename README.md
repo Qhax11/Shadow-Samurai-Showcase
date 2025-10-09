@@ -174,7 +174,7 @@ void UAC_TargetLockSystem::TickComponent(float DeltaTime, ELevelTick TickType, F
 }
 ```
 
-#### **3.1 Camera Rotation**
+#### **1.3.1 Camera Rotation**
 
 - <ins>Smooth Look:</ins> The camera's control rotation is smoothly interpolated towards the target using UKismetMathLibrary::RInterpTo and RotateInterpSpeed.
 ```c++
@@ -241,7 +241,7 @@ float UAC_TargetLockSystem::RotateCameraToTargetClampPitch(float NewPitch)
 }
 ```
 
-#### **3.2 Character Rotation**
+#### **1.3.2 Character Rotation**
 
 - <ins>Yaw-Only Update:</ins> The Hero's actor rotation is interpolated towards the target's location. Critically, only the Yaw axis is updated, preserving the Pitch and Roll to avoid conflicts with movement and animation logic.
 ```c++
