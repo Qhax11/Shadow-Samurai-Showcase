@@ -562,16 +562,22 @@ The ability successfully retrieves the attacker's reference from the TriggerEven
 
 ### **3. Shadow Attack** 
 
-ShadowAttack is a special ability that allows the player character to instantly teleport to a selected location or enemy, then trigger a follow-up attack using a pre-configured gameplay ability from the HeroShadowTargetActor.
+The Shadow Attack is a specialized teleport-and-strike ability that enables the player to instantly relocate to a selected target or location, immediately followed by the activation of a pre-configured offensive ability. The core of this system is the HeroShadowTargetActor, which acts as the target marker and ability execution proxy.
+
+Ability Flow
+The UGA_HeroShadowAttack follows a three-phase activation process:
+- Activation
+- Target Selection
+- Confirmation
+
+#### 3.1 Activation Phase
+
+During activation, the ability applies a targeting tag to restrict input and initializes the target actor responsible for placement.
 
 
-- Ability Flow
-- Activation Phase
+- <ins>Input Restriction:</ins> The tag AbilityTargeting_Shadow is added to the ActivationOwnedTags. This tag prevents the execution of other input-driven abilities while the player is defining the shadow's location.
 
-ActivationOwnedTags includes AbilityTargeting_Shadow to prevent other input reactions during targeting.
-
-SpawnAndSetupTargetActor() is called to place the shadow target in the world based on lock-on state or line tracing.
-
+- <ins>Target Actor Setup:</ins> The SpawnAndSetupTargetActor function is called to place the visual target marker in the world, establishing the intended teleport destination based on the character's current state.
 ```c++
 void UGA_HeroShadowAttack::SpawnAndSetupTargetActor(FRotator Rotation, FVector Location)
 {
@@ -615,39 +621,24 @@ void UGA_HeroShadowAttack::SpawnAndSetupTargetActor(FRotator Rotation, FVector L
 }
 ```
 
-- Target Selection Phase
-
-If lock-on is active:
-
-Shadow actor is placed near the current enemy target.
+#### 3.2 Target Selection Phase
+This function determines the precise spawn location and rotation for the shadow marker, adapting its behavior based on whether the player is currently lock-on to an enemy.
 
 
-If no lock-on:
+#### 3.3 Confirmation Phase
 
-A trace is performed to find potential targets.
+Once the player confirms the location, the ability transitions from a targeting phase to the offensive execution phase
 
-Shadow target is stored in the Shadow Controller component for later use.
+- <ins>Input Teleportation:</ins> The player character is instantly moved to the exact position and rotation of the spawned HeroShadowTargetActor.
 
-- Confirmation Phase
+- <ins>Input Re-enable:</ins> The AbilityTargeting_Shadow tag is manually removed early. This ensures that the system is ready to receive new input (e.g., combo follow-ups) while the offensive animation/ability is playing.
 
-When player confirms the shadow location:
+- <ins>Follow-up Attack:</ins> If the HeroShadowTargetActor has a valid AbilityClass configured, that ability is activated immediately. This follow-up ability contains the actual damage and animation logic.
 
-The player teleports to the shadow actor's position and rotation.
-
-AbilityTargeting_Shadow tag is manually removed early to block further combo input while attack plays.
-
-If the HeroShadowTargetActor has a valid AbilityClass, that ability (e.g., a damage or animation ability) is triggered.
-
-BP_OnTargetActorConfirm() is called for Blueprint integration or visual scripting.
-
-- In-game preview for player: 
+In-game preview for player: 
  
 https://github.com/user-attachments/assets/f8cd5cb3-24e0-4640-a64c-c19014647c26
 
-- In-game preview for AI: 
-
-
-https://github.com/user-attachments/assets/52071bd4-a53a-4ec6-a5d6-25605eae1345
 
 ## AI
 `Developing a robust and intelligent AI for a fast-paced combat system was one of the most challenging aspects of this project.` To meet the demands of dynamic combat and achieve granular control, I created a custom, data-driven system. This architecture provides several key advantages:
