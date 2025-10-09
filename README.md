@@ -450,20 +450,15 @@ void UAC_HeroMeleeComboManager::OnComboMeleeAttackAbilityEnd(const FAbilityEnded
 ```
   
 ### **2. Parry**
-The parry system allows the player to negate incoming attacks by timing a defensive ability just before getting hit.
-If the parry is successful, the attacker is knocked back or staggered through a triggered follow-up ability.
+The parry system allows the player to negate incoming attacks by timing a defensive ability just before getting hit. If the parry is successful, the attacker is knocked back or staggered through a triggered follow-up ability.
 
 In-game preview:
 
-
 https://github.com/user-attachments/assets/8b71a822-1348-4409-87a1-5e5ed62223c6
 
+#### 2.1 The Parry Ability: Setting the State
 
-
-The system works as follows:
-
-The parry ability (UGA_ParryBase) applies a GameplayTag that marks the character as "parrying".
-
+The UGA_ParryBase ability is the defensive action performed by the player. Its primary purpose is to establish the parrying state on the defender by applying a specific Gameplay Tag upon activation.
 ```c++
 UGA_ParryBase::UGA_ParryBase()
 {
@@ -476,8 +471,13 @@ UGA_ParryBase::UGA_ParryBase()
 }
 ```
 
-During the attack’s ExecutionCalculation, if the target has the parry tag, a special check is performed via CalculateParry.
+The ActivationOwnedTags feature ensures that TAG_Gameplay_State_InCombat_Parry is present on the defender's Ability System Component only for the duration the parry ability is active, defining the precise parry window.
 
+#### 2.2 Execution Calculation: Checking for a Parry
+
+During the attack's Execution Calculation (UEC_DamageBase), a critical check is performed prior to damage calculation to intercept the damage if a parry is successful.
+
+- <ins>The Parry Intercept Logic:</ins> This initial check validates the defender's state and, if successful, delegates the final directional validation to a dedicated function.
 ```c++
 if (Params.TargetASC->HasMatchingGameplayTag(GAS_Tags::TAG_Gameplay_State_InCombat_Parry))
 {
@@ -489,7 +489,48 @@ if (Params.TargetASC->HasMatchingGameplayTag(GAS_Tags::TAG_Gameplay_State_InComb
 }
 ```
 
-If the check succeeds, a Gameplay Event is triggered, allowing the parry ability to process the result (e.g. knockback, posture break, slow-mo).
+If the defender has the parry tag, and CalculateParry returns true, the Execution Calculation immediately exits (return;), negating all incoming damage, and a Gameplay Event is triggered to activate the knockback ability.
+
+- <ins>Directional Validation:</ins> The CalculateParry function strictly enforces the directional constraint, ensuring the parry succeeds only if the incoming attack originates from within the defender's frontal arc.
+```c++
+bool UEC_DamageBase::CalculateParry(FExecCalculationParameters& Params) const
+{
+	if (!Params.TargetActor)
+	{
+		return false;
+	}
+
+	float ToleranceAngle = 90.0f;
+
+	// Get locations of source (attacker) and target (defender)
+	FVector SourceLocation = Params.SourceActor->GetActorLocation();
+	FVector TargetLocation = Params.TargetActor->GetActorLocation();
+
+	// Get the forward vector of the target (the direction they are facing)
+	FVector TargetForward = Params.TargetActor->GetActorForwardVector();
+
+	// Calculate the direction from the target to the source (attacker)
+	FVector DirectionToMe = (SourceLocation - TargetLocation).GetSafeNormal();
+
+	// Compute the dot product: 
+	// -1 = completely opposite direction (back turned)
+	//  1 = directly facing
+	//  0 = exactly 90 degrees
+	float DotProduct = FVector::DotProduct(TargetForward, DirectionToMe);
+
+	// Convert dot product to an angle in degrees
+	float Angle = FMath::RadiansToDegrees(FMath::Acos(DotProduct));
+
+	// If the angle is within the allowed tolerance, the target is facing the source
+	return Angle <= (ToleranceAngle / 2.0f);
+}
+```
+
+This logic utilizes the Dot Product between the defender's forward vector and the attack vector to establish a 45∘ frontal cone for successful parries.
+ 
+#### 2.3 Execution (UGA_ParryKnockbackBase)
+
+This ability is the follow-up response, activated by the Gameplay Event sent from the Execution Calculation upon a successful parry. Its role is to apply the resulting effects to both parties.
 
 ```c++
 void UGA_ParryKnockbackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
@@ -515,6 +556,9 @@ void UGA_ParryKnockbackBase::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 	BP_ApplyForce(TriggerEventData->Instigator);
 }
 ```
+
+The ability successfully retrieves the attacker's reference from the TriggerEventData->Instigator field, allowing it to apply physical force (BP_ApplyForce) and any self-buffs or post-parry effects via the ParryKnockbackEffect.
+
 
 ### **3. Shadow Attack** 
 
