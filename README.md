@@ -273,12 +273,9 @@ Characters can take damage from various sources, including environmental hazards
 ### **1. Combo Abilities**
 The Melee Combo System is a core offensive mechanic designed to manage sequential melee attacks. It uses a highly data-driven approach built on the Gameplay Ability System (GAS) for robust state control and execution flow.
 
-In-game preview:
-
 https://github.com/user-attachments/assets/0308b885-7e32-4ee0-942d-bd06d70460e6
 
-Data-Driven Design: Combo Chain Definition
-
+#### 1.1 Data-Driven Design: Combo Chain Definition
 Attack sequences are defined entirely within Data Assets, giving designers complete control over the attack flow and allowing for easy configuration without code changes.
 
 - <ins>Data Asset Container:</ins> `UComboChainAsset` is the primary container, holding an array of all possible `FComboChainData` sequences (e.g., Light Combo, Heavy Combo) available to the character.
@@ -321,11 +318,11 @@ struct FComboAbilityData
 };
 ```
 
-2. Combo State Management and Execution:
+#### 1.2 Combo State Management and Execution:
 
 The entire process is managed by the UAC_MeleeComboManager component, which uses the central FActiveComboChainTracker struct to maintain the combo's progression and runtime state.
 
-2.1 State Tracking (FActiveComboChainTracker):
+#### 1.2.1 State Tracking (FActiveComboChainTracker):
 
 This struct is the single source of truth for the active combo sequence, holding all necessary runtime references and control flags.
 
@@ -388,7 +385,7 @@ struct FActiveComboChainTracker
 };
 ```
 
-3. Execution Flow and Timing
+#### 1.3 Execution Flow and Timing
 
 Each strike in the sequence is executed as a separate UGA_ComboMeleeAttack derived ability. The system's robustness lies in its precise control over the timing between attacks.
 
@@ -396,7 +393,7 @@ Each strike in the sequence is executed as a separate UGA_ComboMeleeAttack deriv
 
 - ![image](https://github.com/user-attachments/assets/6b1d9c79-12cf-475f-8197-fe3aeb29f019)
 
-3.1 Progression Timing via GAS Events:
+1.3.1 Progression Timing via GAS Events:
 
 The moment the player can input the next attack is controlled by the animation's timeline, not by fixed engine delays.
 
@@ -417,7 +414,7 @@ void UGA_ComboMeleeAttack::OnEventReceived(FGameplayTag EventTag, FGameplayEvent
 
 - <ins>Input Re-enabling:</ins> Upon receiving this event, the ability broadcasts a delegate (OnCanExecuteNextAttack.Broadcast()) which signals the manager to set bNextAttackAllowed = true, granting the player a window to transition to the next strike
 
-3.2. Combo Termination
+1.3.2 Combo Termination
 
 The combo chain is designed to reset for two primary reasons: successful completion or interruption. The OnComboMeleeAttackAbilityEnd function handles the finalization logic.
 
