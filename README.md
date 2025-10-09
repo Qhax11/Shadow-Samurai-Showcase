@@ -320,7 +320,7 @@ struct FComboAbilityData
 
 #### 1.2 Combo State Management and Execution:
 
-The entire process is managed by the UAC_MeleeComboManager component, which uses the central FActiveComboChainTracker struct to maintain the combo's progression and runtime state.
+The entire process is managed by the `UAC_MeleeComboManager` component, which uses the central `FActiveComboChainTracker` struct to maintain the combo's progression and runtime state.
 
 1.2.1 State Tracking:
 
@@ -387,9 +387,9 @@ struct FActiveComboChainTracker
 
 #### 1.3 Execution Flow and Timing
 
-Each strike in the sequence is executed as a separate UGA_ComboMeleeAttack derived ability. The system's robustness lies in its precise control over the timing between attacks.
+Each strike in the sequence is executed as a separate `UGA_ComboMeleeAttack` derived ability. The system's robustness lies in its precise control over the timing between attacks.
 
-- Each attack is a separate UGA_ComboMeleeAttack derived ability.
+- Each attack is a separate `UGA_ComboMeleeAttack` derived ability.
 
 - ![image](https://github.com/user-attachments/assets/6b1d9c79-12cf-475f-8197-fe3aeb29f019)
 
@@ -397,9 +397,9 @@ Each strike in the sequence is executed as a separate UGA_ComboMeleeAttack deriv
 
 The moment the player can input the next attack is controlled by the animation's timeline, not by fixed engine delays.
 
-- <ins>Event Signal:</ins> The active ability (UGA_ComboMeleeAttack) listens for the animation event tag TAG_Gameplay_AttackEvent_CanActivateNextAttack.
+- <ins>Event Signal:</ins> The active ability `(UGA_ComboMeleeAttack)` listens for the animation event tag TAG_Gameplay_AttackEvent_CanActivateNextAttack.
 
-- <ins>Input Re-enabling:</ins> Upon receiving this event, the ability broadcasts a delegate (OnCanExecuteNextAttack.Broadcast()) which signals the manager to set bNextAttackAllowed = true, granting the player a window to transition to the next strike
+- <ins>Input Re-enabling:</ins> Upon receiving this event, the ability broadcasts a delegate `(OnCanExecuteNextAttack.Broadcast())` which signals the manager to set `bNextAttackAllowed` = true, granting the player a window to transition to the next strike
 
 ```c++
 void UGA_ComboMeleeAttack::OnEventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
@@ -417,11 +417,11 @@ void UGA_ComboMeleeAttack::OnEventReceived(FGameplayTag EventTag, FGameplayEvent
 
 1.3.2 Combo Termination
 
-The combo chain is designed to reset for two primary reasons: successful completion or interruption. The OnComboMeleeAttackAbilityEnd function handles the finalization logic.
+The combo chain is designed to reset for two primary reasons: successful completion or interruption. The `OnComboMeleeAttackAbilityEnd` function handles the finalization logic.
 
-- <ins>Successful End:</ins> If the ability ends normally (!EndedData.bWasCancelled), it is assumed the sequence is complete, and ActiveComboChainTracker.Reset() is called.
+- <ins>Successful End:</ins> If the ability ends normally `(!EndedData.bWasCancelled)`, it is assumed the sequence is complete, and `ActiveComboChainTracker.Reset()` is called.
 
-- <ins>Cancellation:</ins> If the ability is cancelled (EndedData.bWasCancelled), the system verifies if the index had already advanced to the end (IsChainFinished()). Regardless, the tracker is reset to ensure a clean state for the next input.
+- <ins>Cancellation:</ins> If the ability is cancelled `(EndedData.bWasCancelled)`, the system verifies if the index had already advanced to the end `(IsChainFinished())`. Regardless, the tracker is reset to ensure a clean state for the next input.
 ```c++
 void UAC_HeroMeleeComboManager::OnComboMeleeAttackAbilityEnd(const FAbilityEndedData& EndedData)
 {
