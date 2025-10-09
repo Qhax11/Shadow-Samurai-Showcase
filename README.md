@@ -24,6 +24,9 @@ https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
 ## Contents
 - [Gameplay Systems](#Gameplay-Systems)
      - [Target Lock System](#1-Target-Lock-System)
+          - [Activation and Deactivation](#11-Activation-and-Deactivation)
+          - [Dynamic Target Switching](#12-Dynamic-Target-Switching)
+          - [Orientation and Interpolation](#13-Orientation-and-Interpolation)
 - [Combat Abilities](#Combat-Abilities)
      - [Combo Abilities](#1-Combo-Abilities) 
      - [Parry](#2-Parry)
@@ -68,10 +71,10 @@ In-game preview:
 
 https://github.com/user-attachments/assets/86938f1b-b053-4e41-8f8f-916d75851006
 
-### **1. Activation and Deactivation**
+### **1.1 Activation and Deactivation**
 The lock state is toggled via an input action (IA_ActivateTargetLock).
 
-#### **1.1 Initial Lock Acquisition**
+#### **1.1.1 Initial Lock Acquisition**
 The system initiates the lock by finding the optimal initial target. This process involves a trace, filtering, and selection before applying GAS tags and enabling the component's Tick function.
 
 - <ins>Target Selection:</ins> The system executes a trace to find all hostile actors. It then calls FilterOutDeadActors to ensure only viable targets are considered, followed by FindNearestActor to select the closest one.
@@ -111,7 +114,7 @@ void UAC_TargetLockSystem::StartTargetLock(UGAS_AbilityTraceData* TracingData)
 	OnStartTargetLock.Broadcast();
 }
 ```
-#### **1.2 Lock Termination**
+#### **1.1.2 Lock Termination**
 The lock can be terminated manually by the player or automatically by the system (e.g., during a Finisher or on target death). Termination ensures a clean state transition by resetting controls and removing tags.
 
 - <ins>Cleanup:</ins> All associated Gameplay Tags are removed from both the Hero and the Target. The CurrentTarget pointer is cleared, the bLocked boolean is set to false, and the component's Tick function is disabled.
@@ -133,7 +136,7 @@ void UAC_TargetLockSystem::EndTargetLock()
 	SetComponentTickEnabled(false);
 }
 ```
-#### **1.3 State Management via GAS Tags**
+#### **1.1.3 State Management via GAS Tags**
 The system actively manages the lock state based on critical combat events by subscribing to GAS tag changes on the Hero:
 
 - <ins>Finisher Interruption:</ins> When the Finisher tag is added, the lock is terminated (EndTargetLock) to prevent rotation interference during the cinematic.
@@ -152,14 +155,14 @@ void UAC_TargetLockSystem::OnHeroFinisherTagRemoved(const UAbilitySystemComponen
 }
 ```
 
-### **2. Dynamic Target Switching**
+### **1.2 Dynamic Target Switching**
 Target switching is handled via the LookMouse input action, which processes horizontal mouse movement.
 
 - <ins>Cooldown Mechanism:</ins> Switching is rate-limited using TryToFindNewTargetExecutionCooldown. An attempt is only processed if the horizontal mouse input exceeds a Threshold and the cooldown for that direction (Left/Right) has expired.
 
 - <ins>Switching Logic:</ins> The function executes a sophisticated selection algorithm that prioritizes the nearest target in the desired direction, with an override for targets directly in the player's view.
 
-### **3. Orientation and Interpolation**
+### **1.3.1 Orientation and Interpolation**
 The TickComponent orchestrates the continuous, smooth rotation of the camera and the character.
 ```c++
 void UAC_TargetLockSystem::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
