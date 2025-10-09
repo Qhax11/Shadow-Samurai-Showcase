@@ -162,7 +162,7 @@ Target switching is handled via the LookMouse input action, which processes hori
 
 - <ins>Switching Logic:</ins> The function executes a sophisticated selection algorithm that prioritizes the nearest target in the desired direction, with an override for targets directly in the player's view.
 
-### **1.3.1 Orientation and Interpolation**
+### **1.3 Orientation and Interpolation**
 The TickComponent orchestrates the continuous, smooth rotation of the camera and the character.
 ```c++
 void UAC_TargetLockSystem::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
