@@ -570,6 +570,10 @@ The UGA_HeroShadowAttack follows a three-phase activation process:
 - Target Selection
 - Confirmation
 
+In-game preview: 
+ 
+https://github.com/user-attachments/assets/f8cd5cb3-24e0-4640-a64c-c19014647c26
+
 #### 3.1 Activation Phase
 
 During activation, the ability applies a targeting tag to restrict input and initializes the target actor responsible for placement.
@@ -635,9 +639,7 @@ Once the player confirms the location, the ability transitions from a targeting 
 
 - <ins>Follow-up Attack:</ins> If the HeroShadowTargetActor has a valid AbilityClass configured, that ability is activated immediately. This follow-up ability contains the actual damage and animation logic.
 
-In-game preview for player: 
- 
-https://github.com/user-attachments/assets/f8cd5cb3-24e0-4640-a64c-c19014647c26
+
 
 
 ## AI
