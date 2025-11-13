@@ -14,12 +14,11 @@ The goal is to demonstrate modular design, combat-focused GAS usage, and single-
 The following gameplay video is from an early prototype using an older version of the system.
 While it's outdated, it still provides a good idea of the core gameplay direction and what I'm trying to achieve.
 
-Gameplay video: 
-
+- Boss Gameplay Video: 
 https://github.com/user-attachments/assets/bf4e20b6-5643-43d1-805b-7249f075e180
 
-[https://www.youtube.com/watch?v=MeE0K9q4MFQ](https://www.youtube.com/watch?v=MeE0K9q4MFQ)
-
+- Basic Enemy Gameplay Video:
+https://github.com/user-attachments/assets/1bef7f9c-86a3-4fa1-8e1e-3d9b37dca4aa
 
 ## Contents
 - [Gameplay Systems](#Gameplay-Systems)
