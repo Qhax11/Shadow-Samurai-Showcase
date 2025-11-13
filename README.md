@@ -16,9 +16,9 @@ While it's outdated, it still provides a good idea of the core gameplay directio
 
 Gameplay video: 
 
-https://github.com/user-attachments/assets/ad2094bd-ed0a-4734-b12d-c078d2cd2895
+https://github.com/user-attachments/assets/bf4e20b6-5643-43d1-805b-7249f075e180
 
-[https://www.youtube.com/watch?v=_B-iSA1eJA4&ab_channel=%C5%9Eamil%C3%96zel](https://www.youtube.com/watch?v=rrsV4eMGDK8)
+[https://www.youtube.com/watch?v=MeE0K9q4MFQ](https://www.youtube.com/watch?v=MeE0K9q4MFQ)
 
 
 ## Contents
