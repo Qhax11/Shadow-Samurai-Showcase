@@ -11,8 +11,7 @@ Instead, this repository focuses on showcasing the core gameplay systems, archit
 
 The goal is to demonstrate modular design, combat-focused GAS usage, and single-player action mechanics in Unreal Engine.
 
-The following gameplay video is from an early prototype using an older version of the system.
-While it's outdated, it still provides a good idea of the core gameplay direction and what I'm trying to achieve.
+These gameplay videos demonstrate the core mechanics and direction of the project.
 
 - Boss Gameplay Video:
   
